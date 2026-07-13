@@ -97,7 +97,9 @@ contract Deploy is Script {
         FruitRushCosmetics cosmetics = FruitRushCosmetics(address(proxy));
         console.log("Proxy deployed at:         ", address(proxy));
 
-        // ── 3. Register initial item types ────────────────────────────────────
+        vm.stopBroadcast();
+
+        // ── 3. Register initial item types (Local simulation only) ────────────
         //      Supply caps follow launch-catalogue design:
         //        Common:    5 000  (relatively abundant)
         //        Rare:      1 000
@@ -111,45 +113,22 @@ contract Deploy is Script {
 
         string memory b = baseURI; // shorthand
 
-        // Knife Skins
-        cosmetics.addItemType(KNIFE_COMMON_1,    5000, _join(b, "knife/common/1/metadata.json"));
-        cosmetics.addItemType(KNIFE_COMMON_2,    5000, _join(b, "knife/common/2/metadata.json"));
-        cosmetics.addItemType(KNIFE_RARE_1,      1000, _join(b, "knife/rare/1/metadata.json"));
-        cosmetics.addItemType(KNIFE_EPIC_1,       250, _join(b, "knife/epic/1/metadata.json"));
-        cosmetics.addItemType(KNIFE_LEGENDARY_1,   50, _join(b, "knife/legendary/1/metadata.json"));
-
-        // Fruit Skins
-        cosmetics.addItemType(FRUIT_COMMON_1,    5000, _join(b, "fruit/common/1/metadata.json"));
-        cosmetics.addItemType(FRUIT_RARE_1,      1000, _join(b, "fruit/rare/1/metadata.json"));
-        cosmetics.addItemType(FRUIT_EPIC_1,       250, _join(b, "fruit/epic/1/metadata.json"));
-        cosmetics.addItemType(FRUIT_LEGENDARY_1,   50, _join(b, "fruit/legendary/1/metadata.json"));
-
-        // Trail Effects
-        cosmetics.addItemType(TRAIL_COMMON_1,    5000, _join(b, "trail/common/1/metadata.json"));
-        cosmetics.addItemType(TRAIL_RARE_1,      1000, _join(b, "trail/rare/1/metadata.json"));
-        cosmetics.addItemType(TRAIL_EPIC_1,       250, _join(b, "trail/epic/1/metadata.json"));
-        cosmetics.addItemType(TRAIL_LEGENDARY_1,   50, _join(b, "trail/legendary/1/metadata.json"));
-
-        // Backgrounds
-        cosmetics.addItemType(BG_COMMON_1,       5000, _join(b, "bg/common/1/metadata.json"));
-        cosmetics.addItemType(BG_RARE_1,         1000, _join(b, "bg/rare/1/metadata.json"));
-        cosmetics.addItemType(BG_EPIC_1,          250, _join(b, "bg/epic/1/metadata.json"));
-        cosmetics.addItemType(BG_LEGENDARY_1,      50, _join(b, "bg/legendary/1/metadata.json"));
-
-        vm.stopBroadcast();
+        // Note: To avoid Celo sequencer rate limit / gapped nonces,
+        // these calls were removed from the initial deploy script.
+        // You can register them on-chain using a separate batch script or manual transactions.
 
         // ── 4. Log summary ────────────────────────────────────────────────────
         console.log("");
         console.log("=== Deployment Complete ===");
         console.log("Implementation : ", address(implementation));
         console.log("Proxy (use this):", address(proxy));
-        console.log("17 item types registered.");
         console.log("");
         console.log("Next steps:");
         console.log("  1. Verify implementation on Celoscan (automatic if --verify flag used)");
-        console.log("  2. Grant MINTER_ROLE to the shop contract after deployment");
-        console.log("  3. Transfer DEFAULT_ADMIN_ROLE to multisig if deployer != adminAddr");
-        console.log("  4. Store PROXY_ADDRESS in your backend .env");
+        console.log("  2. Register initial item types (e.g. via separate script or admin calls)");
+        console.log("  3. Grant MINTER_ROLE to the shop contract after deployment");
+        console.log("  4. Transfer DEFAULT_ADMIN_ROLE to multisig if deployer != adminAddr");
+        console.log("  5. Store PROXY_ADDRESS in your backend .env");
     }
 
     // ─── Internal helper: string concatenation ────────────────────────────────

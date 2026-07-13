@@ -182,6 +182,14 @@ contract FruitRushCosmetics is
         emit ItemTypeAdded(tokenId, maxSupply, tokenURI_);
     }
 
+    /// @notice Update the metadata URI for a registered item type. Only callable by DEFAULT_ADMIN_ROLE.
+    /// @param tokenId   The registered token ID.
+    /// @param tokenURI_ New metadata URI.
+    function setTokenURI(uint256 tokenId, string calldata tokenURI_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (!itemTypes[tokenId].exists) revert UnknownItemType(tokenId);
+        _setURI(tokenId, tokenURI_);
+    }
+
     /// @notice Update the royalty receiver address. Keeps the 5% fraction.
     function setRoyaltyReceiver(address newReceiver) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newReceiver == address(0)) revert ZeroAddress();

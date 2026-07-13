@@ -396,6 +396,32 @@ contract FruitRushCosmeticsTest is Test {
         assertEq(cosmetics.uri(newId), expected);
     }
 
+    function test_uri_setTokenURI_succeedsForAdmin() public {
+        string memory newUri = "ipfs://QmUpdatedKnife1/metadata.json";
+        vm.prank(admin);
+        cosmetics.setTokenURI(TOKEN_KNIFE_COMMON_1, newUri);
+        assertEq(cosmetics.uri(TOKEN_KNIFE_COMMON_1), newUri);
+    }
+
+    function test_uri_setTokenURI_revertsForNonAdmin() public {
+        string memory newUri = "ipfs://QmUpdatedKnife1/metadata.json";
+        vm.prank(stranger);
+        vm.expectRevert();
+        cosmetics.setTokenURI(TOKEN_KNIFE_COMMON_1, newUri);
+    }
+
+    function test_uri_setTokenURI_revertsForUnknownToken() public {
+        uint256 unregistered = (1 << 248) | (2 << 240) | 999;
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                FruitRushCosmetics.UnknownItemType.selector,
+                unregistered
+            )
+        );
+        cosmetics.setTokenURI(unregistered, "ipfs://new");
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     //  9. ROYALTY CALCULATION (ERC-2981)
     // ═══════════════════════════════════════════════════════════════════════════
