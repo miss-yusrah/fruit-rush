@@ -14,8 +14,8 @@
   --mist: rgba(244, 237, 224, 0.08);
   --line: rgba(244, 237, 224, 0.14);
 
-  --font-display: 'Bricolage Grotesk', system-ui, sans-serif;
-  --font-body: 'Instrument Sans', system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', 'Bricolage Grotesk', system-ui, sans-serif;
+  --font-body: 'Instrument Sans Variable', 'Instrument Sans', system-ui, sans-serif;
 
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);

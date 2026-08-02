@@ -243,7 +243,11 @@ export class AudioManager {
     if (!this.ctx) return
     if (this.ctx.state === 'suspended') {
       try {
-        await this.ctx.resume()
+        // Some browsers never settle resume() until a gesture — don't hang callers.
+        await Promise.race([
+          this.ctx.resume(),
+          new Promise<void>((resolve) => window.setTimeout(resolve, 120)),
+        ])
       } catch {
         /* ignore */
       }

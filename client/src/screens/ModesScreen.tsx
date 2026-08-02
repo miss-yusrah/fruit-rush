@@ -40,29 +40,37 @@ export function ModesScreen({ guest = false, onBack, onSelect }: ModesScreenProp
       />
 
       <Hotspot
-        top={35}
-        left={6}
-        width={88}
-        height={15.5}
-        label="Classic"
+        top={34}
+        left={5}
+        width={90}
+        height={15}
+        label="Classic — endless survival, bombs live"
         onClick={() => pick('Classic')}
       />
       <Hotspot
-        top={53}
-        left={6}
-        width={88}
-        height={16}
-        label="Zen"
+        top={51}
+        left={5}
+        width={90}
+        height={17}
+        label="Zen — 90 seconds, no bombs"
         onClick={() => pick('Zen')}
       />
       <Hotspot
-        top={71}
-        left={6}
-        width={88}
-        height={14.5}
-        label="Arcade"
+        top={70}
+        left={5}
+        width={90}
+        height={16}
+        label="Arcade — frenzy with hazards"
         onClick={() => pick('Arcade')}
       />
+
+      {/* Correct the baked art subtitles (old art had Classic/Zen rules swapped). */}
+      <p className="modes-rule modes-rule--classic" aria-hidden>
+        Endless. Bombs live.
+      </p>
+      <p className="modes-rule modes-rule--zen" aria-hidden>
+        90 seconds. No bombs.
+      </p>
 
       {guest && (
         <div className="modes-guest-note" role="note">

@@ -14,7 +14,14 @@ interface ArtScreenProps {
 export function ArtScreen({ src, alt, children, className = '' }: ArtScreenProps) {
   return (
     <section className={`art-screen ${className}`.trim()}>
-      <img className="art-screen__img" src={src} alt={alt} draggable={false} />
+      <img
+        className="art-screen__img"
+        src={src}
+        alt={alt}
+        draggable={false}
+        decoding="async"
+        fetchPriority="high"
+      />
       <div className="art-screen__hits">{children}</div>
     </section>
   )

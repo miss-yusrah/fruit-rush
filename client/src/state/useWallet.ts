@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { Connector } from 'wagmi'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { useWalletContext } from '../wallet/WalletRoot'
 import { isMiniPay } from '../wallet/minipay'
 import { useMiniPayAutoConnect } from '../wallet/useMiniPayAutoConnect'
 
@@ -39,8 +40,13 @@ function shorten(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
 }
 
-/** Real account via wagmi. MiniPay auto-connects; browsers show a friendly picker. */
+/** App-facing hook — reads deferred-or-live state from WalletRoot. */
 export function useWallet(): WalletState {
+  return useWalletContext()
+}
+
+/** Real account via wagmi. Only used inside LiveWalletBridge. */
+export function useWalletImpl(): WalletState {
   useMiniPayAutoConnect()
 
   const account = useAccount()

@@ -1,22 +1,54 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { audio } from './audio'
 import { PhoneStage } from './components/PhoneStage'
 import { WalletMenu } from './components/WalletMenu'
 import type { GameEndPayload } from './game/types'
-import { BoastScreen } from './screens/BoastScreen'
-import { ConnectScreen } from './screens/ConnectScreen'
-import { HomeScreen } from './screens/HomeScreen'
-import { ModesScreen } from './screens/ModesScreen'
-import { OnboardingScreen } from './screens/OnboardingScreen'
-import { PlayScreen } from './screens/PlayScreen'
-import { ProfileScreen } from './screens/ProfileScreen'
-import { ResultsScreen } from './screens/ResultsScreen'
-import { SettingsScreen } from './screens/SettingsScreen'
-import { ShopScreen } from './screens/ShopScreen'
-import { SplashScreen } from './screens/SplashScreen'
-import { TournamentScreen } from './screens/TournamentScreen'
+import { LoadingScreen } from './screens/LoadingScreen'
 import { useWallet } from './state/useWallet'
 import type { GameMode, GameSessionResult, ScreenId } from './types/game'
+
+/** Lazy screens — keep Pixi, shop, results, etc. out of the boot JS graph. */
+const ConnectScreen = lazy(() =>
+  import('./screens/ConnectScreen').then((m) => ({ default: m.ConnectScreen })),
+)
+const HomeScreen = lazy(() =>
+  import('./screens/HomeScreen').then((m) => ({ default: m.HomeScreen })),
+)
+const ModesScreen = lazy(() =>
+  import('./screens/ModesScreen').then((m) => ({ default: m.ModesScreen })),
+)
+const OnboardingScreen = lazy(() =>
+  import('./screens/OnboardingScreen').then((m) => ({ default: m.OnboardingScreen })),
+)
+const PlayScreen = lazy(() =>
+  import('./screens/PlayScreen').then((m) => ({ default: m.PlayScreen })),
+)
+const ProfileScreen = lazy(() =>
+  import('./screens/ProfileScreen').then((m) => ({ default: m.ProfileScreen })),
+)
+const ResultsScreen = lazy(() =>
+  import('./screens/ResultsScreen').then((m) => ({ default: m.ResultsScreen })),
+)
+const SettingsScreen = lazy(() =>
+  import('./screens/SettingsScreen').then((m) => ({ default: m.SettingsScreen })),
+)
+const ShopScreen = lazy(() =>
+  import('./screens/ShopScreen').then((m) => ({ default: m.ShopScreen })),
+)
+const BoastScreen = lazy(() =>
+  import('./screens/BoastScreen').then((m) => ({ default: m.BoastScreen })),
+)
+const TournamentScreen = lazy(() =>
+  import('./screens/TournamentScreen').then((m) => ({ default: m.TournamentScreen })),
+)
+
+function ScreenFallback() {
+  return <div className="screen-fallback" aria-hidden />
+}
+
+function Lazy({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<ScreenFallback />}>{children}</Suspense>
+}
 
 const ONBOARDED_KEY = 'fruit-rush-onboarded'
 const PB_KEY = 'fruit-rush-personal-best'
@@ -71,11 +103,22 @@ function screenFromPath(pathname: string): ScreenId | null {
 
 function initialScreen(): ScreenId {
   const fromPath = screenFromPath(window.location.pathname)
-  if (!fromPath) return 'splash'
+  // Always boot through the asset loader first (maps to splash path).
+  if (!fromPath || fromPath === 'splash') return 'splash'
   // Settings is a modal now — land on home if someone opens /settings cold.
-  if (fromPath === 'settings') return 'home'
+  if (fromPath === 'settings') return 'splash'
   // These need an in-memory game result, which a fresh load never has.
-  if (fromPath === 'results' || fromPath === 'boast') return 'home'
+  if (fromPath === 'results' || fromPath === 'boast') return 'splash'
+  // Deep links still show the loader, then jump to the requested screen.
+  return 'splash'
+}
+
+/** Path the user asked for before the loader ran (deep link restore). */
+function pendingDeepLink(): ScreenId | null {
+  const fromPath = screenFromPath(window.location.pathname)
+  if (!fromPath || fromPath === 'splash') return null
+  if (fromPath === 'settings') return 'home'
+  if (fromPath === 'results' || fromPath === 'boast') return null
   return fromPath
 }
 
@@ -90,12 +133,15 @@ export default function App() {
   // Where the connect screen should land after connect / continue-as-guest.
   const [connectNext, setConnectNext] = useState<ScreenId>('home')
   const [mode, setMode] = useState<GameMode>('Classic')
+  /** Bumps on every Play entry so the round always mounts with the mode just picked. */
+  const [playEpoch, setPlayEpoch] = useState(0)
   const [lastResult, setLastResult] = useState<GameSessionResult | null>(null)
   const [personalBest, setPersonalBest] = useState(loadPersonalBest)
   const [mintedId, setMintedId] = useState<number | null>(null)
   const [minting, setMinting] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(initialSettingsOpen)
+  const [deepLink] = useState(pendingDeepLink)
 
   const showToast = useCallback((message: string) => {
     setToast(message)
@@ -215,6 +261,10 @@ export default function App() {
   }, [closeMenu, lastResult])
 
   const handleSplashDone = useCallback(() => {
+    if (deepLink) {
+      navigate(deepLink, { replace: true })
+      return
+    }
     if (!loadOnboarded()) {
       navigate('onboarding', { replace: true })
     } else if (wallet.status === 'connected' || guest) {
@@ -223,7 +273,7 @@ export default function App() {
       setConnectNext('home')
       navigate('connect', { replace: true })
     }
-  }, [navigate, wallet.status, guest])
+  }, [navigate, wallet.status, guest, deepLink])
 
   const handleOnboardingDone = useCallback(() => {
     try {
@@ -287,144 +337,178 @@ export default function App() {
 
   return (
     <PhoneStage>
-      {screen === 'splash' && <SplashScreen onDone={handleSplashDone} />}
+      {screen === 'splash' && <LoadingScreen onDone={handleSplashDone} />}
 
-      {screen === 'onboarding' && <OnboardingScreen onDone={handleOnboardingDone} />}
+      {screen === 'onboarding' && (
+        <Lazy>
+          <OnboardingScreen onDone={handleOnboardingDone} />
+        </Lazy>
+      )}
 
       {screen === 'connect' && (
-        <ConnectScreen
-          wallet={wallet}
-          onDone={() => navigate(connectNext, { replace: true })}
-          onGuest={() => {
-            setGuest(true)
-            try {
-              sessionStorage.setItem(GUEST_KEY, '1')
-            } catch {
-              /* ignore */
-            }
-            navigate(connectNext, { replace: true })
-          }}
-        />
+        <Lazy>
+          <ConnectScreen
+            wallet={wallet}
+            onDone={() => navigate(connectNext, { replace: true })}
+            onGuest={() => {
+              setGuest(true)
+              try {
+                sessionStorage.setItem(GUEST_KEY, '1')
+              } catch {
+                /* ignore */
+              }
+              navigate(connectNext, { replace: true })
+            }}
+          />
+        </Lazy>
       )}
 
       {screen === 'home' && (
-        <HomeScreen
-          onPlay={() => {
-            // Play gates through connect-or-guest until a choice is made.
-            if (wallet.status === 'connected' || guest) {
-              go('modes')
-            } else {
-              setConnectNext('modes')
-              go('connect')
-            }
-          }}
-          onShop={() => go('shop')}
-          onCompete={() => go('tournaments')}
-        />
+        <Lazy>
+          <HomeScreen
+            onPlay={() => {
+              // Play gates through connect-or-guest until a choice is made.
+              if (wallet.status === 'connected' || guest) {
+                go('modes')
+              } else {
+                setConnectNext('modes')
+                go('connect')
+              }
+            }}
+            onShop={() => go('shop')}
+            onCompete={() => go('tournaments')}
+          />
+        </Lazy>
       )}
 
       {screen === 'modes' && (
-        <ModesScreen
-          guest={guest && wallet.status !== 'connected'}
-          onBack={() => go('home')}
-          onSelect={(selected) => {
-            // Set mode first, then enter play in the same tick (batched).
-            setMode(selected)
-            go('play')
-          }}
-        />
+        <Lazy>
+          <ModesScreen
+            guest={guest && wallet.status !== 'connected'}
+            onBack={() => go('home')}
+            onSelect={(selected) => {
+              // Lock mode + remount key in the same tick as navigation so the
+              // round never boots with a stale mode config.
+              setMode(selected)
+              setPlayEpoch((n) => n + 1)
+              go('play')
+            }}
+          />
+        </Lazy>
       )}
 
       {screen === 'play' && (
-        <PlayScreen
-          key={mode}
-          mode={mode}
-          onExit={() => go('modes')}
-          onEnded={handleGameEnd}
-        />
+        <Lazy>
+          <PlayScreen
+            key={`${mode}-${playEpoch}`}
+            mode={mode}
+            onExit={() => go('modes')}
+            onEnded={handleGameEnd}
+          />
+        </Lazy>
       )}
 
       {screen === 'results' && lastResult && (
-        <ResultsScreen
-          result={lastResult}
-          personalBest={personalBest}
-          onPlayAgain={() => go('play')}
-          onBoast={() => go('boast')}
-          onHome={() => go('home')}
-          onShop={() => go('shop')}
-          onToast={showToast}
-        />
+        <Lazy>
+          <ResultsScreen
+            result={lastResult}
+            personalBest={personalBest}
+            onPlayAgain={() => {
+              setPlayEpoch((n) => n + 1)
+              go('play')
+            }}
+            onBoast={() => go('boast')}
+            onHome={() => go('home')}
+            onShop={() => go('shop')}
+            onToast={showToast}
+          />
+        </Lazy>
       )}
 
       {screen === 'shop' && (
-        <ShopScreen
-          onBuy={(name) => {
-            if (!wallet.requireConnect()) {
-              showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to buy')
-              return
-            }
-            showToast(`Checkout stub · ${name}`)
-          }}
-          onNavigate={go}
-        />
+        <Lazy>
+          <ShopScreen
+            onBuy={(name) => {
+              if (!wallet.requireConnect()) {
+                showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to buy')
+                return
+              }
+              showToast(`Checkout stub · ${name}`)
+            }}
+            onNavigate={go}
+          />
+        </Lazy>
       )}
 
       {screen === 'tournaments' && (
-        <TournamentScreen
-          onEnter={(id) => {
-            if (!wallet.requireConnect()) {
-              showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to enter')
-              return
-            }
-            showToast(`Entered ${id}`)
-            setMode('Tournament')
-            void audio.unlock().then(() => audio.enterGameplay())
-            go('play')
-          }}
-          onNavigate={go}
-        />
+        <Lazy>
+          <TournamentScreen
+            onEnter={(id) => {
+              if (!wallet.requireConnect()) {
+                showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to enter')
+                return
+              }
+              showToast(`Entered ${id}`)
+              setMode('Tournament')
+              setPlayEpoch((n) => n + 1)
+              void audio.unlock().then(() => audio.enterGameplay())
+              go('play')
+            }}
+            onNavigate={go}
+          />
+        </Lazy>
       )}
 
       {screen === 'boast' && lastResult && (
-        <BoastScreen
-          mintedId={mintedId}
-          minting={minting}
-          onMint={() => {
-            if (!wallet.requireConnect()) {
-              showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to save your boast')
-              return
-            }
-            setMinting(true)
-            window.setTimeout(() => {
-              setMintedId(Math.floor(1000 + Math.random() * 9000))
-              setMinting(false)
-              showToast('Boast saved (demo)')
-            }, 900)
-          }}
-          onShare={async () => {
-            const url = `https://fruitrush.gg/boast/${mintedId ?? 'demo'}`
-            try {
-              if (navigator.share) {
-                await navigator.share({
-                  title: 'Fruit Rush Boast',
-                  text: `I scored ${lastResult.score.toLocaleString()} in Fruit Rush`,
-                  url,
-                })
-              } else {
-                await navigator.clipboard.writeText(url)
-                showToast('Boast link copied')
+        <Lazy>
+          <BoastScreen
+            mintedId={mintedId}
+            minting={minting}
+            onMint={() => {
+              if (!wallet.requireConnect()) {
+                showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to save your boast')
+                return
               }
-            } catch {
-              showToast('Share cancelled')
-            }
-          }}
-          onDismiss={() => go('home')}
-        />
+              setMinting(true)
+              window.setTimeout(() => {
+                setMintedId(Math.floor(1000 + Math.random() * 9000))
+                setMinting(false)
+                showToast('Boast saved (demo)')
+              }, 900)
+            }}
+            onShare={async () => {
+              const url = `https://fruitrush.gg/boast/${mintedId ?? 'demo'}`
+              try {
+                if (navigator.share) {
+                  await navigator.share({
+                    title: 'Fruit Rush Boast',
+                    text: `I scored ${lastResult.score.toLocaleString()} in Fruit Rush`,
+                    url,
+                  })
+                } else {
+                  await navigator.clipboard.writeText(url)
+                  showToast('Boast link copied')
+                }
+              } catch {
+                showToast('Share cancelled')
+              }
+            }}
+            onDismiss={() => go('home')}
+          />
+        </Lazy>
       )}
 
-      {screen === 'profile' && <ProfileScreen onPlay={() => go('modes')} onNavigate={go} />}
+      {screen === 'profile' && (
+        <Lazy>
+          <ProfileScreen onPlay={() => go('modes')} onNavigate={go} />
+        </Lazy>
+      )}
 
-      {settingsOpen && <SettingsScreen onClose={closeSettings} />}
+      {settingsOpen && (
+        <Lazy>
+          <SettingsScreen onClose={closeSettings} />
+        </Lazy>
+      )}
 
       {showSettingsChip && (
         <button
