@@ -9,6 +9,7 @@ import {
   TextStyle,
   Texture,
 } from 'pixi.js'
+import { audio } from '../audio'
 import type { GameMode } from '../types/game'
 import {
   MODE_CONFIG,
@@ -184,6 +185,8 @@ export class FruitRushGame {
   private timeLeft: number | null = 60
   private status: GameHudState['status'] = 'countdown'
   private countdown = 3
+  /** Last spoken countdown cue so we don't re-trigger every frame. */
+  private lastCountdownCue = 4
   private elapsed = 0
   private waveTimer = 0.4
   private frenzyTimer = 0
@@ -222,14 +225,19 @@ export class FruitRushGame {
 
   async start() {
     const app = new Application()
+    // Cap DPR on phones — full 3x Retina + juice particles hitch mid-swipe.
+    const coarse = window.matchMedia('(pointer: coarse)').matches
+    const dprCap = coarse ? 1.5 : 2
     await app.init({
       resizeTo: this.host,
       backgroundAlpha: 0,
-      antialias: true,
-      resolution: Math.min(window.devicePixelRatio || 1, 2),
+      antialias: !coarse,
+      resolution: Math.min(window.devicePixelRatio || 1, dprCap),
       autoDensity: true,
       preference: 'webgl',
+      powerPreference: 'high-performance',
     })
+    app.ticker.maxFPS = 60
 
     await this.loadTextures()
 
@@ -284,6 +292,7 @@ export class FruitRushGame {
 
   destroy() {
     this.destroyed = true
+    audio.stopMusic()
     this.host.removeEventListener('pointerdown', this.boundPointerDown)
     window.removeEventListener('pointermove', this.boundPointerMove)
     window.removeEventListener('pointerup', this.boundPointerUp)
@@ -323,11 +332,18 @@ export class FruitRushGame {
 
     if (this.status === 'countdown') {
       this.countdown -= realDt
+      const cue = this.countdown > 2.2 ? 3 : this.countdown > 1.2 ? 2 : this.countdown > 0.3 ? 1 : 0
+      if (cue > 0 && cue !== this.lastCountdownCue) {
+        this.lastCountdownCue = cue
+        audio.playCountdown(cue as 3 | 2 | 1)
+      }
       if (this.countdown <= 0) {
         this.status = 'playing'
         this.countdown = 0
         this.sessionStart = performance.now()
         this.waveTimer = 0.35
+        audio.playCountdown('slice')
+        audio.startMusic()
       }
       this.emitHud()
       return
@@ -356,7 +372,10 @@ export class FruitRushGame {
 
       if (this.combo > 0) {
         this.comboTimer -= dt
-        if (this.comboTimer <= 0) this.combo = 0
+        if (this.comboTimer <= 0) {
+          this.combo = 0
+          audio.setComboIntensity(0)
+        }
       }
       if (this.burstTimer > 0) {
         this.burstTimer -= realDt
@@ -777,6 +796,9 @@ export class FruitRushGame {
       this.shake = Math.max(this.shake, 3.5)
       this.freeze = Math.max(this.freeze, this.burstCount >= 3 ? 0.07 : 0.038)
 
+      audio.playSlice(fruit.kind)
+      audio.playCombo(this.combo)
+
       this.announceSlice(fruit.x, fruit.y)
     }
 
@@ -801,6 +823,8 @@ export class FruitRushGame {
     this.shake = 22
     this.freeze = 0.12
     this.endDelay = 0.95
+    audio.playBomb()
+    audio.stopMusic()
 
     // Fiery burst.
     for (let i = 0; i < 26; i++) {
@@ -825,6 +849,7 @@ export class FruitRushGame {
     this.freeze = 0.08
     this.combo = 0
     this.lives -= 1
+    audio.playSpike()
     for (let i = 0; i < 14; i++) {
       const angle = Math.random() * Math.PI * 2
       const speed = 120 + Math.random() * 280
@@ -848,6 +873,7 @@ export class FruitRushGame {
     this.freeze = 0.05
     this.combo = 0
     this.score = Math.max(0, this.score - 40)
+    audio.playIce()
     for (let i = 0; i < 18; i++) {
       const angle = Math.random() * Math.PI * 2
       const speed = 90 + Math.random() * 240
@@ -938,7 +964,10 @@ export class FruitRushGame {
     // Juice sprays mostly perpendicular to the swipe.
     const nx = -Math.sin(sliceAngle)
     const ny = Math.cos(sliceAngle)
-    for (let i = 0; i < 14; i++) {
+    const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+    const drops = coarse ? 7 : 14
+    const seeds = coarse ? Math.min(2, spec.seeds) : spec.seeds
+    for (let i = 0; i < drops; i++) {
       const side = Math.random() < 0.5 ? -1 : 1
       const spread = (Math.random() - 0.5) * 1.6
       const dirX = nx * side + Math.cos(sliceAngle) * spread
@@ -955,7 +984,7 @@ export class FruitRushGame {
         0.38 + Math.random() * 0.3,
       )
     }
-    for (let i = 0; i < spec.seeds; i++) {
+    for (let i = 0; i < seeds; i++) {
       const angle = Math.random() * Math.PI * 2
       const speed = 120 + Math.random() * 220
       this.pushParticle(
@@ -973,7 +1002,8 @@ export class FruitRushGame {
 
   private spawnSplat(x: number, y: number, spec: FruitSpec) {
     const g = new Graphics()
-    for (let i = 0; i < 7; i++) {
+    const blobs = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches ? 4 : 7
+    for (let i = 0; i < blobs; i++) {
       const angle = Math.random() * Math.PI * 2
       const dist = Math.random() * spec.radius * 0.9
       g.circle(Math.cos(angle) * dist, Math.sin(angle) * dist, 5 + Math.random() * spec.radius * 0.4)
@@ -1042,6 +1072,7 @@ export class FruitRushGame {
     if (this.status === 'ended') return
     this.status = 'ended'
     this.slicing = false
+    audio.stopMusic()
     this.emitHud()
     const durationSeconds = Math.max(1, Math.round((performance.now() - this.sessionStart) / 1000))
     this.onEnd({

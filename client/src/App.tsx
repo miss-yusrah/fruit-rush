@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { audio } from './audio'
 import { PhoneStage } from './components/PhoneStage'
 import { WalletMenu } from './components/WalletMenu'
 import type { GameEndPayload } from './game/types'
@@ -10,6 +11,7 @@ import { OnboardingScreen } from './screens/OnboardingScreen'
 import { PlayScreen } from './screens/PlayScreen'
 import { ProfileScreen } from './screens/ProfileScreen'
 import { ResultsScreen } from './screens/ResultsScreen'
+import { SettingsScreen } from './screens/SettingsScreen'
 import { ShopScreen } from './screens/ShopScreen'
 import { SplashScreen } from './screens/SplashScreen'
 import { TournamentScreen } from './screens/TournamentScreen'
@@ -57,6 +59,7 @@ const SCREEN_PATHS: Record<ScreenId, string> = {
   boast: '/boast',
   tournaments: '/tournaments',
   profile: '/profile',
+  settings: '/settings',
 }
 
 function screenFromPath(pathname: string): ScreenId | null {
@@ -114,6 +117,22 @@ export default function App() {
   useEffect(() => {
     window.history.replaceState(null, '', SCREEN_PATHS[screen])
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Browsers require a user gesture before audio can start — unlock on first tap,
+  // then start menu music if the player left Game Music on.
+  useEffect(() => {
+    const unlock = () => {
+      void audio.unlock().then(() => {
+        if (audio.isMusicEnabled) audio.startMusic()
+      })
+    }
+    window.addEventListener('pointerdown', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
   }, [])
 
   // Browser/hardware back and forward buttons.
@@ -191,7 +210,10 @@ export default function App() {
     screen === 'tournaments' ||
     screen === 'profile' ||
     screen === 'boast' ||
-    (wallet.menuOpen && screen !== 'connect')
+    (wallet.menuOpen && screen !== 'connect' && screen !== 'settings')
+
+  const showSettingsChip =
+    screen === 'home' || screen === 'profile' || screen === 'shop' || screen === 'tournaments'
 
   return (
     <PhoneStage>
@@ -328,6 +350,22 @@ export default function App() {
       )}
 
       {screen === 'profile' && <ProfileScreen onPlay={() => go('modes')} onNavigate={go} />}
+
+      {screen === 'settings' && <SettingsScreen onBack={() => go('home')} />}
+
+      {showSettingsChip && (
+        <button
+          type="button"
+          className="settings-chip"
+          aria-label="Settings"
+          onClick={() => {
+            void audio.unlock().then(() => audio.playUi('tap'))
+            go('settings')
+          }}
+        >
+          <span className="settings-chip__icon" aria-hidden />
+        </button>
+      )}
 
       {showWallet && (
         <div className="wallet-global">

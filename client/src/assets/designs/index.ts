@@ -5,6 +5,7 @@ import shopArt from './shop.png'
 import boastArt from './boast.png'
 import competeArt from './compete.png'
 import profileArt from './profile.png'
+import settingsArt from './settings.png'
 
 /** Design frame from the phone mockups (vertical-stretch 1170×2532). */
 export const DESIGN_WIDTH = 1170
@@ -19,6 +20,7 @@ export const designArt = {
   boast: boastArt,
   compete: competeArt,
   profile: profileArt,
+  settings: settingsArt,
 } as const
 
 export type DesignScreen = keyof typeof designArt

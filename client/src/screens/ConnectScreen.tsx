@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { audio } from '../audio'
 import { designArt } from '../assets/designs'
 import { WalletOptions } from '../components/WalletOptions'
 import type { WalletState } from '../state/useWallet'
@@ -36,7 +37,14 @@ export function ConnectScreen({ wallet, onDone, onGuest }: ConnectScreenProps) {
           <WalletOptions wallet={wallet} />
         </div>
 
-        <button type="button" className="btn-ghost" onClick={onGuest}>
+        <button
+          type="button"
+          className="btn-ghost"
+          onClick={() => {
+            void audio.unlock().then(() => audio.playUi('pop'))
+            onGuest()
+          }}
+        >
           Continue as guest
         </button>
         <p className="connect-screen__fine">
