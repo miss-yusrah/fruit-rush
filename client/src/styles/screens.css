@@ -1,0 +1,5 @@
+/* Screen-specific overrides kept minimal — visuals come from design art. */
+
+.play-screen {
+  /* inherits .art-screen */
+}
