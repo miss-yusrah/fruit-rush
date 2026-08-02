@@ -17,6 +17,8 @@ body,
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  /* Kill the gray/ash OS tap flash on every control */
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -29,6 +31,7 @@ body {
   overscroll-behavior: none;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button {
@@ -38,6 +41,8 @@ button {
   border: none;
   background: none;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
 }
 
 img {
@@ -146,15 +151,29 @@ img {
 .hotspot {
   position: absolute;
   z-index: 3;
-  border-radius: 8px;
+  border-radius: 14px;
   background: transparent;
   pointer-events: auto;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  outline: none;
+  /* Press feedback lives on transform/shadow — never a washed fill */
+  transition:
+    transform 110ms var(--ease-out),
+    box-shadow 110ms var(--ease-out);
+  will-change: transform;
 }
 
+/* Mature game press: soft lime ring + tiny squeeze. No ash overlay. */
 .hotspot:active {
-  background: rgba(255, 255, 255, 0.08);
+  background: transparent;
+  transform: scale(0.97);
+  box-shadow: inset 0 0 0 2px rgba(200, 245, 66, 0.55);
+}
+
+.hotspot:focus-visible {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px rgba(200, 245, 66, 0.7);
 }
 
 .hotspot:disabled {
@@ -746,12 +765,28 @@ img {
   font-size: 0.92rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform 110ms var(--ease-out),
+    filter 110ms var(--ease-out),
+    box-shadow 110ms var(--ease-out);
+}
+
+.btn-primary:active,
+.btn-secondary:active,
+.btn-ghost:active {
+  transform: scale(0.97);
 }
 
 .btn-primary {
   background: linear-gradient(180deg, #ff7a2e 0%, var(--tangerine) 55%, var(--tangerine-deep) 100%);
   color: #1a0c04;
   box-shadow: 0 8px 22px rgba(255, 107, 26, 0.32);
+}
+
+.btn-primary:active {
+  filter: brightness(0.96);
+  box-shadow: 0 4px 14px rgba(255, 107, 26, 0.28);
 }
 
 .btn-secondary {
@@ -764,6 +799,11 @@ img {
   background: transparent;
   color: var(--cream-dim);
   border: 1px solid rgba(244, 237, 224, 0.22);
+}
+
+.btn-ghost:active {
+  border-color: rgba(200, 245, 66, 0.45);
+  color: var(--cream);
 }
 
 /* Splash — home poster art with slow zoom */
