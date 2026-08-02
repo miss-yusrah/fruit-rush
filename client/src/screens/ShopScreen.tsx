@@ -9,10 +9,10 @@ interface ShopScreenProps {
 }
 
 const ITEMS = [
-  { name: 'Starter Blade', top: 26, left: 3, width: 46, height: 28 },
-  { name: 'Melon Crush', top: 26, left: 51, width: 46, height: 28 },
-  { name: 'Golden Pine', top: 54, left: 3, width: 46, height: 28 },
-  { name: 'Dragon Edge', top: 54, left: 51, width: 46, height: 28 },
+  { name: 'Starter Blade', top: 27, left: 5, width: 44, height: 28.5 },
+  { name: 'Melon Crush', top: 27, left: 51, width: 44, height: 28.5 },
+  { name: 'Golden Pine', top: 56.5, left: 5, width: 44, height: 29 },
+  { name: 'Dragon Edge', top: 56.5, left: 51, width: 44, height: 29 },
 ] as const
 
 export function ShopScreen({ onBuy, onNavigate }: ShopScreenProps) {

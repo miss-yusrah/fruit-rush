@@ -19,22 +19,22 @@ export function BoastScreen({
 }: BoastScreenProps) {
   return (
     <ArtScreen src={designArt.boast} alt="Prove it on-chain">
-      {/* Mint — measured ~76.7–79% */}
+      {/* MINT BOAST button measured at 77.5–83%; Share ~86–90; Not Now ~92–96 */}
       {mintedId == null ? (
         <Hotspot
-          top={75.5}
-          left={8}
-          width={84}
-          height={5}
+          top={77.5}
+          left={20}
+          width={60}
+          height={6}
           label={minting ? 'Minting' : 'Mint Boast'}
           disabled={minting}
           onClick={onMint}
         />
       ) : (
-        <Hotspot top={75.5} left={8} width={84} height={5} label="Share" onClick={onShare} />
+        <Hotspot top={77.5} left={20} width={60} height={6} label="Share" onClick={onShare} />
       )}
-      <Hotspot top={81.5} left={28} width={44} height={4} label="Share" onClick={onShare} />
-      <Hotspot top={86.5} left={28} width={44} height={4.5} label="Not now" onClick={onDismiss} />
+      <Hotspot top={86} left={32} width={36} height={4.5} label="Share" onClick={onShare} />
+      <Hotspot top={92} left={32} width={36} height={4.5} label="Not now" onClick={onDismiss} />
     </ArtScreen>
   )
 }

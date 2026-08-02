@@ -11,20 +11,27 @@ interface TournamentScreenProps {
 export function TournamentScreen({ onEnter, onNavigate }: TournamentScreenProps) {
   return (
     <ArtScreen src={designArt.compete} alt="Fruit Rush compete">
-      <Hotspot top={68} left={8} width={84} height={8} label="Enter Daily Slash" onClick={() => onEnter('daily-slash')} />
       <Hotspot
-        top={78}
+        top={69.5}
+        left={20}
+        width={60}
+        height={6.5}
+        label="Enter Daily Slash"
+        onClick={() => onEnter('daily-slash')}
+      />
+      <Hotspot
+        top={82}
         left={4}
         width={92}
-        height={5.5}
+        height={5}
         label="Enter Fruit Frenzy"
         onClick={() => onEnter('fruit-frenzy')}
       />
       <Hotspot
-        top={84}
+        top={87.5}
         left={4}
         width={92}
-        height={5.5}
+        height={5}
         label="Enter Orchard Open"
         onClick={() => onEnter('orchard-open')}
       />

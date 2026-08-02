@@ -8,15 +8,25 @@ interface HomeScreenProps {
   onCompete: () => void
 }
 
+/**
+ * Hotspots measured on home.png with a 2% grid:
+ *  - PLAY button: 71–83.5% tall, 29–73% wide
+ *  - "Shop · Tournaments" text row: 85.5–88% (thumb-padded below)
+ */
 export function HomeScreen({ onPlay, onShop, onCompete }: HomeScreenProps) {
   return (
     <ArtScreen src={designArt.home} alt="Fruit Rush home">
-      {/* PLAY — ends before Shop/Tournaments so links stay clickable */}
-      <Hotspot top={70.5} left={12} width={76} height={7} label="Play" onClick={onPlay} />
+      <Hotspot top={71} left={28} width={46} height={12.5} label="Play" onClick={onPlay} />
 
-      {/* Shop · Tournaments — measured on home.png */}
-      <Hotspot top={77.5} left={36} width={30} height={6} label="Shop" onClick={onShop} />
-      <Hotspot top={77.5} left={64} width={22} height={6} label="Tournaments" onClick={onCompete} />
+      <Hotspot top={84.5} left={29} width={14} height={5} label="Shop" onClick={onShop} />
+      <Hotspot
+        top={84.5}
+        left={44}
+        width={26}
+        height={5}
+        label="Tournaments"
+        onClick={onCompete}
+      />
     </ArtScreen>
   )
 }

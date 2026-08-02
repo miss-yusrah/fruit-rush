@@ -10,10 +10,9 @@ interface ModesScreenProps {
 }
 
 /**
- * Hotspots are measured to the wooden planks on modes.png and must NOT overlap.
- * Classic used to end at 42% while its plank continues lower — Zen sat on top of
- * Classic's subtitle, so tapping Classic started Zen (endless, no bombs).
- * Classic is rendered last so it wins any edge-pixel fight.
+ * Hotspots measured on modes.png with a 2% grid — they sit exactly on the
+ * wooden planks (x 6–94%):
+ *  Classic 35–50.5% · Zen 53–69% · Arcade 71–85.5%
  */
 export function ModesScreen({ guest = false, onBack, onSelect }: ModesScreenProps) {
   return (
@@ -21,28 +20,28 @@ export function ModesScreen({ guest = false, onBack, onSelect }: ModesScreenProp
       <Hotspot top={2} left={1} width={14} height={6} label="Back" onClick={onBack} />
 
       <Hotspot
-        top={48}
-        left={5}
-        width={90}
-        height={10}
+        top={35}
+        left={6}
+        width={88}
+        height={15.5}
+        label="Classic"
+        onClick={() => onSelect('Classic')}
+      />
+      <Hotspot
+        top={53}
+        left={6}
+        width={88}
+        height={16}
         label="Zen"
         onClick={() => onSelect('Zen')}
       />
       <Hotspot
-        top={59}
-        left={5}
-        width={90}
-        height={12}
+        top={71}
+        left={6}
+        width={88}
+        height={14.5}
         label="Arcade"
         onClick={() => onSelect('Arcade')}
-      />
-      <Hotspot
-        top={31}
-        left={5}
-        width={90}
-        height={16}
-        label="Classic"
-        onClick={() => onSelect('Classic')}
       />
 
       {guest && (
