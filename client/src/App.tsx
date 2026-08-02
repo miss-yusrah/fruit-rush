@@ -126,6 +126,13 @@ function initialSettingsOpen(): boolean {
   return window.location.pathname === SCREEN_PATHS.settings
 }
 
+const SAVE_PROGRESS_PROMPT =
+  'Sign in with Email or Connect Wallet to save your progress.'
+
+function saveProgressToast(inMiniPay: boolean): string {
+  return inMiniPay ? 'Opening MiniPay…' : SAVE_PROGRESS_PROMPT
+}
+
 export default function App() {
   const wallet = useWallet()
   const [screen, setScreen] = useState<ScreenId>(initialScreen)
@@ -430,7 +437,7 @@ export default function App() {
           <ShopScreen
             onBuy={(name) => {
               if (!wallet.requireConnect()) {
-                showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to buy')
+                showToast(saveProgressToast(wallet.inMiniPay))
                 return
               }
               showToast(`Checkout stub · ${name}`)
@@ -445,7 +452,7 @@ export default function App() {
           <TournamentScreen
             onEnter={(id) => {
               if (!wallet.requireConnect()) {
-                showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to enter')
+                showToast(saveProgressToast(wallet.inMiniPay))
                 return
               }
               showToast(`Entered ${id}`)
@@ -466,7 +473,7 @@ export default function App() {
             minting={minting}
             onMint={() => {
               if (!wallet.requireConnect()) {
-                showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to save your boast')
+                showToast(saveProgressToast(wallet.inMiniPay))
                 return
               }
               setMinting(true)

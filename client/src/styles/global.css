@@ -285,15 +285,15 @@ img {
   top: calc(100% + 8px);
   right: 0;
   z-index: 22;
-  width: min(220px, 72vw);
-  padding: 0.85rem;
+  width: min(280px, 82vw);
+  padding: 0.9rem;
   border-radius: 12px;
   border: 1px solid rgba(244, 237, 224, 0.18);
   background: rgba(12, 36, 28, 0.97);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.55rem;
 }
 
 .wallet-popover__title {
@@ -1195,6 +1195,214 @@ img {
   margin: 0;
   color: rgba(201, 192, 176, 0.7);
   font-size: 0.74rem;
+}
+
+.connect-screen__divider {
+  margin: 0.15rem 0 0;
+  text-align: center;
+  color: rgba(201, 192, 176, 0.55);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.connect-screen__section,
+.wallet-popover__section {
+  margin: 0;
+  color: var(--cream);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+/* Three-path connect choices (email / wallet / guest) */
+
+.connect-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem; /* gap-4 */
+  width: 100%;
+}
+
+.connect-choice {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  min-height: 64px;
+  max-height: 72px;
+  padding: 17px 24px;
+  border-radius: 12px; /* rounded-xl */
+  border: 1px solid rgba(244, 237, 224, 0.14);
+  background: rgba(244, 237, 224, 0.04);
+  color: var(--cream);
+  text-align: left;
+  box-shadow: none;
+  transition:
+    background 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    filter 160ms var(--ease-out);
+}
+
+.connect-choice:hover:not(:disabled) {
+  background: rgba(244, 237, 224, 0.08);
+  border-color: rgba(244, 237, 224, 0.28);
+}
+
+.connect-choice:not(:disabled):active {
+  background: rgba(244, 237, 224, 0.1);
+  border-color: rgba(200, 245, 66, 0.35);
+}
+
+.connect-choice:disabled {
+  opacity: 0.5;
+}
+
+.connect-choice--primary {
+  background: linear-gradient(180deg, #ff7a2e 0%, var(--tangerine) 55%, var(--tangerine-deep) 100%);
+  border-color: rgba(255, 122, 46, 0.35);
+  color: #1a0c04;
+}
+
+.connect-choice--primary .connect-choice__sub {
+  color: rgba(26, 12, 4, 0.7);
+}
+
+.connect-choice--primary:hover:not(:disabled) {
+  filter: brightness(1.04);
+  background: linear-gradient(180deg, #ff7a2e 0%, var(--tangerine) 55%, var(--tangerine-deep) 100%);
+  border-color: rgba(255, 122, 46, 0.5);
+}
+
+.connect-choice--primary:not(:disabled):active {
+  filter: brightness(0.96);
+  border-color: rgba(255, 122, 46, 0.45);
+}
+
+.connect-choice--ghost {
+  background: transparent;
+  border-style: dashed;
+  border-color: rgba(244, 237, 224, 0.2);
+  min-height: 56px;
+  max-height: 64px;
+  padding: 14px 24px;
+}
+
+.connect-choice--ghost:hover:not(:disabled) {
+  background: rgba(244, 237, 224, 0.04);
+  border-color: rgba(244, 237, 224, 0.32);
+}
+
+.connect-choice__title {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 0.84rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.15;
+}
+
+.connect-choice__sub {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--cream-dim);
+  line-height: 1.3;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.connect-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.connect-panel__back {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--cream-dim);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.connect-panel__back:not(:disabled):active {
+  color: var(--lime);
+}
+
+.connect-panel__back:disabled {
+  opacity: 0.5;
+}
+
+/* Email OTP (Magic) — connect screen + account popover */
+
+.email-auth {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.email-auth__label {
+  margin: 0;
+  color: var(--cream);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.email-auth__row {
+  display: flex;
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.email-auth__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(244, 237, 224, 0.18);
+  background: rgba(244, 237, 224, 0.06);
+  color: var(--cream);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+}
+
+.email-auth__input::placeholder {
+  color: rgba(201, 192, 176, 0.55);
+}
+
+.email-auth__input:focus {
+  outline: none;
+  border-color: rgba(200, 245, 66, 0.45);
+}
+
+.email-auth__input:disabled {
+  opacity: 0.55;
+}
+
+.email-auth__continue {
+  width: 100%;
+  min-height: 48px;
+  font-size: 0.82rem;
+}
+
+.email-auth__continue:disabled {
+  opacity: 0.5;
+}
+
+.email-auth--compact .email-auth__label {
+  font-size: 0.78rem;
+}
+
+.email-auth--compact .email-auth__input,
+.email-auth--compact .email-auth__continue {
+  min-height: 44px;
 }
 
 /* Wallet option picker (shared: connect screen + popover) */
