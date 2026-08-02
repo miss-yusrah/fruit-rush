@@ -106,6 +106,8 @@ interface FruitEntity {
   vy: number
   spin: number
   alive: boolean
+  /** Accrues while a bomb is airborne for subtle fuse ticks. */
+  tickAcc?: number
 }
 
 interface HalfEntity {
@@ -205,6 +207,8 @@ export class FruitRushGame {
   private waveTimer = 0.4
   private frenzyTimer = 0
   private inFrenzy = false
+  /** True while the hype dance groove is riding a hot combo. */
+  private hypeFromCombo = false
   /** Fruits launched since the last bomb — drives the guaranteed cadence. */
   private sinceBomb = 0
   /** Launches since the last non-bomb hazard (spike / ice). */
@@ -398,7 +402,9 @@ export class FruitRushGame {
         this.sessionStart = performance.now()
         this.waveTimer = 0.35
         audio.playCountdown('slice')
-        audio.startMusic()
+        // Gameplay bed + ambience already crossfaded in on mode select;
+        // countdown callout nudges the quiet arena theme fully in.
+        if (audio.currentTheme !== 'gameplay') audio.playTheme('gameplay', 400)
       }
       this.emitHud()
       return
@@ -430,6 +436,7 @@ export class FruitRushGame {
         if (this.comboTimer <= 0) {
           this.combo = 0
           audio.setComboIntensity(0)
+          this.dropHypeIfNeeded()
         }
       }
       if (this.burstTimer > 0) {
@@ -458,9 +465,12 @@ export class FruitRushGame {
       if (!this.inFrenzy && this.frenzyTimer > 12) {
         this.inFrenzy = true
         this.frenzyTimer = 0
+        audio.enterHype(400)
       } else if (this.inFrenzy && this.frenzyTimer > 5) {
         this.inFrenzy = false
         this.frenzyTimer = 0
+        // Stay on hype if a hot combo is still rolling.
+        if (!this.hypeFromCombo) audio.playTheme('gameplay', 500)
       }
     }
 
@@ -544,9 +554,11 @@ export class FruitRushGame {
     if (kind === 'bomb') {
       this.sinceBomb = 0
       this.sinceHazard += 1
+      audio.playBombAppear()
     } else if (kind === 'spike' || kind === 'ice') {
       this.sinceHazard = 0
       this.sinceBomb += 1
+      if (kind === 'ice') audio.playIceAppear()
     } else {
       this.sinceBomb += 1
       this.sinceHazard += 1
@@ -598,6 +610,7 @@ export class FruitRushGame {
       vy: -vyMag,
       spin: (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 2.8),
       alive: true,
+      tickAcc: kind === 'bomb' ? 0 : undefined,
     })
   }
 
@@ -651,6 +664,14 @@ export class FruitRushGame {
       fruit.view.x = fruit.x
       fruit.view.y = fruit.y
       fruit.view.rotation += fruit.spin * dt
+
+      if (fruit.kind === 'bomb' && fruit.tickAcc != null) {
+        fruit.tickAcc += dt
+        if (fruit.tickAcc >= 0.24) {
+          fruit.tickAcc = 0
+          audio.playBombTick()
+        }
+      }
 
       if (fruit.vy > 0 && fruit.y - fruit.radius > h + 60) {
         fruit.alive = false
@@ -799,7 +820,9 @@ export class FruitRushGame {
   private onPointerMove(e: PointerEvent) {
     if (!this.slicing || this.status !== 'playing') return
     const p = this.toLocal(e)
+    const speed = Math.hypot(p.x - this.lastPointer.x, p.y - this.lastPointer.y)
     this.trail.push({ ...p, t: performance.now() })
+    if (speed > 8) audio.playBlade(speed)
     this.trySlice(this.lastPointer.x, this.lastPointer.y, p.x, p.y)
     this.lastPointer = p
   }
@@ -883,11 +906,28 @@ export class FruitRushGame {
 
       audio.playSlice(fruit.kind)
       audio.playCombo(this.combo)
+      this.liftHypeForCombo()
 
       this.announceSlice(fruit.x, fruit.y)
     }
 
     this.fruits = this.fruits.filter((f) => f.alive)
+  }
+
+  /** Hot streak (8+) swaps the quiet bed for the hype dance groove. */
+  private liftHypeForCombo() {
+    if (this.combo >= 8 && !this.hypeFromCombo && !this.inFrenzy) {
+      this.hypeFromCombo = true
+      audio.enterHype(350)
+    }
+  }
+
+  private dropHypeIfNeeded() {
+    if (!this.hypeFromCombo) return
+    this.hypeFromCombo = false
+    if (!this.inFrenzy && this.status === 'playing') {
+      audio.playTheme('gameplay', 450)
+    }
   }
 
   private announceSlice(x: number, y: number) {
@@ -936,6 +976,7 @@ export class FruitRushGame {
     this.combo = 0
     this.lives -= 1
     audio.playSpike()
+    this.dropHypeIfNeeded()
     for (let i = 0; i < 14; i++) {
       const angle = Math.random() * Math.PI * 2
       const speed = 120 + Math.random() * 280
@@ -960,6 +1001,7 @@ export class FruitRushGame {
     this.combo = 0
     this.score = Math.max(0, this.score - 40)
     audio.playIce()
+    this.dropHypeIfNeeded()
     for (let i = 0; i < 18; i++) {
       const angle = Math.random() * Math.PI * 2
       const speed = 90 + Math.random() * 240
@@ -1182,6 +1224,9 @@ export class FruitRushGame {
     if (this.status === 'ended') return
     this.status = 'ended'
     this.slicing = false
+    this.inFrenzy = false
+    this.hypeFromCombo = false
+    // Stop arena bed — ResultsScreen brings the dance menu theme back.
     audio.stopMusic()
     this.emitHud()
     const durationSeconds = Math.max(1, Math.round((performance.now() - this.sessionStart) / 1000))

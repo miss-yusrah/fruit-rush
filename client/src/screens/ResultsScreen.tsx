@@ -60,8 +60,36 @@ export function ResultsScreen({
           : result.comboHighwater >= 8
             ? 'juicy'
             : 'nice'
-    void audio.unlock().then(() => audio.playGameOver(cue))
+    void audio.unlock().then(() => {
+      audio.playGameOver(cue)
+    })
   }, [result, youRank])
+
+  useEffect(() => {
+    if (!rewards?.leveledUp) return
+    const id = window.setTimeout(() => audio.playLevelUp(), 700)
+    return () => window.clearTimeout(id)
+  }, [rewards?.leveledUp])
+
+  useEffect(() => {
+    if (!rewards) return
+    // Soft counting ticks synced with the score/loot reveal.
+    const ticks = [180, 320, 460, 600]
+    const timers = ticks.map((ms, i) =>
+      window.setTimeout(() => {
+        audio.playCount(i % 2 === 0 ? 'xp' : 'coin')
+      }, ms),
+    )
+    const coinTimer = window.setTimeout(() => {
+      for (let i = 0; i < Math.min(5, Math.ceil(rewards.coinsEarned / 8)); i++) {
+        window.setTimeout(() => audio.playCoin(), i * 70)
+      }
+    }, 520)
+    return () => {
+      timers.forEach(clearTimeout)
+      window.clearTimeout(coinTimer)
+    }
+  }, [rewards])
 
   if (!rewards) return null
 
@@ -128,7 +156,8 @@ export function ResultsScreen({
             type="button"
             className="btn-primary"
             onClick={() => {
-              audio.playUi('pop')
+              audio.playUi('press')
+              void audio.unlock().then(() => audio.enterGameplay())
               onPlayAgain()
             }}
           >
@@ -139,7 +168,7 @@ export function ResultsScreen({
               type="button"
               className="btn-secondary"
               onClick={() => {
-                audio.playUi('pop')
+                audio.playUi('reward')
                 onBoast()
               }}
             >
@@ -150,7 +179,7 @@ export function ResultsScreen({
             type="button"
             className="btn-ghost"
             onClick={() => {
-              audio.playUi('tap')
+              audio.playUi('close')
               onHome()
             }}
           >

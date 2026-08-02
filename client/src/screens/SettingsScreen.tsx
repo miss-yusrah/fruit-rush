@@ -31,7 +31,7 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
     audio.setMusicEnabled(next)
     setMusic(next)
     if (sfx) audio.playUi('tap')
-    if (next) audio.startMusic()
+    if (next) audio.enterMenu()
   }
 
   const testSlice = async () => {

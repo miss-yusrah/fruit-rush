@@ -17,16 +17,27 @@ interface ModesScreenProps {
  */
 export function ModesScreen({ guest = false, onBack, onSelect }: ModesScreenProps) {
   const pick = (mode: GameMode) => {
-    // Unlock inside the mode-tap gesture so play countdown/SFX aren't silent.
+    // Unlock inside the mode-tap gesture, fade menu → arena whoosh + ambience.
     void audio.unlock().then(() => {
-      if (audio.isMusicEnabled) audio.startMusic()
+      audio.enterGameplay()
     })
     onSelect(mode)
   }
 
   return (
     <ArtScreen src={designArt.modes} alt="Choose your cut">
-      <Hotspot top={2} left={1} width={14} height={6} label="Back" onClick={onBack} />
+          <Hotspot
+        top={2}
+        left={1}
+        width={14}
+        height={6}
+        label="Back"
+        silent
+        onClick={() => {
+          void audio.unlock().then(() => audio.playUi('close'))
+          onBack()
+        }}
+      />
 
       <Hotspot
         top={35}

@@ -120,11 +120,11 @@ export default function App() {
   }, [])
 
   // Browsers require a user gesture before audio can start — unlock on first tap,
-  // then start menu music if the player left Game Music on.
+  // then start the catchy menu theme if Game Music is on.
   useEffect(() => {
     const unlock = () => {
       void audio.unlock().then(() => {
-        if (audio.isMusicEnabled) audio.startMusic()
+        if (audio.isMusicEnabled) audio.enterMenu()
       })
     }
     window.addEventListener('pointerdown', unlock, { once: true })
@@ -134,6 +134,21 @@ export default function App() {
       window.removeEventListener('keydown', unlock)
     }
   }, [])
+
+  // Route the two dance grooves by section; leave play audio alone.
+  useEffect(() => {
+    if (!audio.isUnlocked || !audio.isMusicEnabled) return
+    if (screen === 'play') return
+    // Results / boast keep the party going with the main menu groove.
+    if (screen === 'results' || screen === 'boast' || screen === 'home' || screen === 'modes' || screen === 'settings' || screen === 'connect' || screen === 'profile' || screen === 'onboarding' || screen === 'splash') {
+      if (audio.currentTheme !== 'menu') audio.enterMenu()
+      return
+    }
+    // Shop & tournaments get the hotter alternate dance groove.
+    if (screen === 'shop' || screen === 'tournaments') {
+      if (audio.currentTheme !== 'hype') audio.enterHype(600)
+    }
+  }, [screen])
 
   // Browser/hardware back and forward buttons.
   useEffect(() => {
@@ -313,6 +328,7 @@ export default function App() {
             }
             showToast(`Entered ${id}`)
             setMode('Tournament')
+            void audio.unlock().then(() => audio.enterGameplay())
             go('play')
           }}
           onNavigate={go}
@@ -366,7 +382,7 @@ export default function App() {
           className="settings-chip"
           aria-label="Settings"
           onClick={() => {
-            void audio.unlock().then(() => audio.playUi('tap'))
+            void audio.unlock().then(() => audio.playUi('open'))
             go('settings')
           }}
         >

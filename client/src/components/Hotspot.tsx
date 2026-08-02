@@ -27,11 +27,12 @@ export function Hotspot({
   children,
   silent = false,
   onClick,
+  onPointerEnter,
   ...rest
 }: HotspotProps) {
   const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
     if (!silent) {
-      void audio.unlock().then(() => audio.playUi('tap'))
+      void audio.unlock().then(() => audio.playUi('press'))
     }
     onClick?.(e)
   }
@@ -48,6 +49,12 @@ export function Hotspot({
       }}
       aria-label={label}
       onClick={handleClick}
+      onPointerEnter={(e) => {
+        // Hover must not bootstrap AudioContext — browsers only unlock on
+        // click/tap/key. Play the soft tick only after a real unlock.
+        if (!silent && audio.isUnlocked) audio.playUi('hover')
+        onPointerEnter?.(e)
+      }}
       {...rest}
     >
       {children}
