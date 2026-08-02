@@ -86,42 +86,82 @@ export class AudioManager {
     return this.unlocked
   }
 
-  /** Must run inside a user gesture (tap/click). Safe to call repeatedly. */
-  async unlock() {
-    if (this.unlocked && this.ctx?.state === 'running') return
-    const CtxClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
+  get contextState() {
+    return this.ctx?.state ?? 'none'
+  }
+
+  /**
+   * Create the AudioContext graph synchronously. Call from a tap/click when
+   * possible — phones suspend audio after async gaps (texture load, etc.).
+   */
+  private bootstrap() {
+    if (this.ctx) return
+    const CtxClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext
     if (!CtxClass) return
-    if (!this.ctx) {
-      this.ctx = new CtxClass()
-      this.master = this.ctx.createGain()
-      this.master.gain.value = 0.85
-      this.master.connect(this.ctx.destination)
+    this.ctx = new CtxClass()
+    this.master = this.ctx.createGain()
+    this.master.gain.value = 1
+    this.master.connect(this.ctx.destination)
 
-      this.sfx = this.ctx.createGain()
-      this.sfx.gain.value = this.sfxEnabled ? 0.9 : 0
-      this.sfx.connect(this.master)
+    this.sfx = this.ctx.createGain()
+    this.sfx.gain.value = this.sfxEnabled ? 1 : 0
+    this.sfx.connect(this.master)
 
-      this.musicBus = this.ctx.createGain()
-      this.musicBus.gain.value = this.musicEnabled ? 0.55 : 0
-      this.musicBus.connect(this.master)
+    this.musicBus = this.ctx.createGain()
+    this.musicBus.gain.value = this.musicEnabled ? 0.75 : 0
+    this.musicBus.connect(this.master)
 
-      this.noise = noiseBuffer(this.ctx, 0.5)
-      this.buildMusicLayers()
+    this.noise = noiseBuffer(this.ctx, 0.35)
+    this.buildMusicLayers()
+  }
+
+  /** Resume if the browser parked the context (common after game asset load). */
+  private resumeIfNeeded() {
+    if (!this.ctx) return
+    if (this.ctx.state === 'suspended') {
+      void this.ctx.resume().catch(() => {
+        /* gesture required — next tap will retry */
+      })
     }
-    if (this.ctx.state === 'suspended') await this.ctx.resume()
+  }
+
+  /**
+   * Must run inside a user gesture (tap/click). Safe to call repeatedly.
+   * Also safe to call again during play — phones re-suspend after awaits.
+   */
+  async unlock() {
+    this.bootstrap()
+    if (!this.ctx) return
     this.unlocked = true
+    if (this.ctx.state === 'suspended') {
+      try {
+        await this.ctx.resume()
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  /** Sync kick from pointer handlers — keeps audio alive during a round. */
+  kick() {
+    this.bootstrap()
+    if (!this.ctx) return
+    this.unlocked = true
+    this.resumeIfNeeded()
   }
 
   setSfxEnabled(next: boolean) {
     this.sfxEnabled = next
     this.persist()
-    if (this.sfx) this.sfx.gain.value = next ? 0.9 : 0
+    if (this.sfx) this.sfx.gain.value = next ? 1 : 0
   }
 
   setMusicEnabled(next: boolean) {
     this.musicEnabled = next
     this.persist()
-    if (this.musicBus) this.musicBus.gain.value = next ? 0.55 : 0
+    if (this.musicBus) this.musicBus.gain.value = next ? 0.75 : 0
     if (!next) this.stopMusic()
   }
 
@@ -137,9 +177,12 @@ export class AudioManager {
   // ── Music (adaptive tropical arcade loop) ─────────────────
 
   startMusic() {
+    this.kick()
     if (!this.ctx || !this.unlocked || !this.musicEnabled || this.musicOn) return
     this.musicOn = true
     this.beat = 0
+    // Audible bed from the first beat (was near-silent at low layer gains).
+    this.setComboIntensity(0)
     this.scheduleMusic()
   }
 
@@ -158,11 +201,11 @@ export class AudioManager {
     if (!this.ctx || this.layers.length < 5) return
     const t = now(this.ctx)
     const targets = [
-      0.55, // bed always
-      combo >= 5 ? 0.7 : 0.15, // drums
-      combo >= 10 ? 0.55 : 0.08, // bass
-      combo >= 15 ? 0.45 : 0.05, // synth
-      combo >= 20 ? 0.4 : 0.04, // melody
+      0.85, // bed always
+      combo >= 5 ? 0.85 : 0.45, // drums — audible from the start
+      combo >= 10 ? 0.7 : 0.2, // bass
+      combo >= 15 ? 0.55 : 0.12, // synth
+      combo >= 20 ? 0.5 : 0.08, // melody
     ]
     this.layers.forEach((g, i) => {
       g.gain.cancelScheduledValues(t)
@@ -174,7 +217,7 @@ export class AudioManager {
     if (!this.ctx || !this.musicBus) return
     this.layers = [0, 1, 2, 3, 4].map((i) => {
       const g = this.ctx!.createGain()
-      g.gain.value = i === 0 ? 0.55 : 0.08
+      g.gain.value = i === 0 ? 0.85 : i === 1 ? 0.45 : 0.12
       g.connect(this.musicBus!)
       return g
     })
@@ -182,6 +225,7 @@ export class AudioManager {
 
   private scheduleMusic() {
     if (!this.musicOn || !this.ctx) return
+    this.resumeIfNeeded()
     const ctx = this.ctx
     const t0 = now(ctx)
 
@@ -201,20 +245,23 @@ export class AudioManager {
 
   private layerAudible(index: number) {
     const g = this.layers[index]
+    // Bed + drums always schedule; higher layers gate on gain.
+    if (index <= 1) return true
     return Boolean(g && g.gain.value > 0.12)
   }
 
   private hitBed(when: number, step: number) {
     const dest = this.layers[0]
-    if (!this.ctx || !dest) return
+    if (!this.ctx || !dest || !this.noise) return
     if (step % 4 === 0) {
-      playTone(this.ctx, dest, { type: 'triangle', freq: 220, peak: 0.045, decay: 0.22, when })
+      playTone(this.ctx, dest, { type: 'triangle', freq: 220, peak: 0.14, decay: 0.28, when })
+      playTone(this.ctx, dest, { type: 'sine', freq: 110, peak: 0.1, decay: 0.32, when })
     }
     if (step % 4 === 2) {
       playNoise(this.ctx, dest, {
-        buffer: this.noise!,
-        peak: 0.05,
-        decay: 0.07,
+        buffer: this.noise,
+        peak: 0.1,
+        decay: 0.08,
         when,
         highpass: 1500,
         lowpass: 5000,
@@ -224,14 +271,15 @@ export class AudioManager {
 
   private hitDrums(when: number, step: number) {
     const dest = this.layers[1]
-    if (!this.ctx || !dest) return
+    if (!this.ctx || !dest || !this.noise) return
+    // Keep a light kick even before combo so music is obviously "on".
     if (step % 4 === 0) {
-      playTone(this.ctx, dest, { type: 'sine', freq: 70, peak: 0.2, attack: 0.002, decay: 0.16, when })
+      playTone(this.ctx, dest, { type: 'sine', freq: 70, peak: 0.28, attack: 0.002, decay: 0.18, when })
     }
     if (step % 4 === 2) {
       playNoise(this.ctx, dest, {
-        buffer: this.noise!,
-        peak: 0.1,
+        buffer: this.noise,
+        peak: 0.14,
         decay: 0.09,
         when,
         highpass: 2000,
@@ -296,9 +344,9 @@ export class AudioManager {
     playTone(ctx, dest, {
       type: 'triangle',
       freq: f * pitch,
-      peak: 0.16,
+      peak: 0.28,
       attack: 0.002,
-      decay: 0.14,
+      decay: 0.16,
       when: t,
       detune: jitter(0.04),
     })
@@ -306,17 +354,17 @@ export class AudioManager {
       playTone(ctx, dest, {
         type: 'sine',
         freq: voice.freqs[1]! * pitch,
-        peak: 0.08,
+        peak: 0.16,
         attack: 0.002,
-        decay: 0.1,
+        decay: 0.12,
         when: t,
       })
     }
     playNoise(ctx, dest, {
       buffer: this.noise!,
-      peak: voice.noisePeak * (0.85 + Math.random() * 0.3),
+      peak: voice.noisePeak * 1.4,
       attack: 0.001,
-      decay: 0.07 + Math.random() * 0.04,
+      decay: 0.08,
       when: t,
       highpass: 1200,
       lowpass: voice.lowpass,
@@ -611,7 +659,12 @@ export class AudioManager {
   // ── internals ─────────────────────────────────────────────
 
   private ready() {
-    return Boolean(this.unlocked && this.ctx && this.sfx && this.sfxEnabled)
+    if (!this.sfxEnabled) return false
+    this.kick()
+    if (!this.ctx || !this.sfx || !this.noise) return false
+    // Suspended contexts swallow scheduled notes — still return true after kick()
+    // so a resume-in-flight can catch the next sound.
+    return this.unlocked
   }
 }
 

@@ -79,6 +79,8 @@ export function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
     if (!host) return
 
     let cancelled = false
+    // Keep trying — useEffect itself is not a gesture, but unlock after mode tap
+    // may still be in-flight; resume again once the round boots.
     void audio.unlock()
     const game = new FruitRushGame({
       host,
@@ -91,7 +93,12 @@ export function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
       },
     })
 
-    void game.start()
+    void game.start().then(() => {
+      if (cancelled) return
+      void audio.unlock().then(() => {
+        if (audio.isMusicEnabled) audio.startMusic()
+      })
+    })
     return () => {
       cancelled = true
       game.destroy()

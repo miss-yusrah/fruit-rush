@@ -240,6 +240,8 @@ export class FruitRushGame {
     app.ticker.maxFPS = 60
 
     await this.loadTextures()
+    // Asset load often leaves AudioContext suspended — wake it before countdown.
+    await audio.unlock()
 
     if (this.destroyed) {
       app.destroy(true)
@@ -707,6 +709,8 @@ export class FruitRushGame {
   // ------------------------------------------------------------- input
 
   private onPointerDown(e: PointerEvent) {
+    // Phones suspend AudioContext after async texture load — re-kick on every swipe.
+    audio.kick()
     if (this.status !== 'playing') return
     const p = this.toLocal(e)
     this.slicing = true
