@@ -1,0 +1,27 @@
+:root {
+  --ink: #0b1f17;
+  --ink-elevated: #102820;
+  --teal-dusk: #0d3b2e;
+  --teal-mid: #145239;
+  --tangerine: #ff6b1a;
+  --tangerine-deep: #e2550a;
+  --lime: #c8f542;
+  --lime-dim: #9bc22e;
+  --watermelon: #e63946;
+  --gold: #f0c75e;
+  --cream: #f4ede0;
+  --cream-dim: #c9c0b0;
+  --mist: rgba(244, 237, 224, 0.08);
+  --line: rgba(244, 237, 224, 0.14);
+
+  --font-display: 'Bricolage Grotesk', system-ui, sans-serif;
+  --font-body: 'Instrument Sans', system-ui, sans-serif;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --tap: 44px;
+}
