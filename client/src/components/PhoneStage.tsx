@@ -5,8 +5,9 @@ interface PhoneStageProps {
 }
 
 /**
- * Aspect-locked stage matching design art (1170×2532).
- * Scales uniformly to fit any phone viewport — design never crops or letterboxes inside the stage.
+ * Full-viewport stage for the app.
+ * On desktop it sits in a design-aspect phone frame; on phones/tablets the
+ * stage goes edge-to-edge (see global.css) so real devices never letterbox.
  */
 export function PhoneStage({ children }: PhoneStageProps) {
   return (

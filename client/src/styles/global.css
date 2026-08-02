@@ -51,11 +51,14 @@ img {
 }
 
 /*
-  Stage locks to design aspect (1170/2532).
-  Uniform scale to fit viewport — never crop or letterbox the art inside the stage.
+  Desktop: stage sits in a phone-shaped frame so the art reads like the mockups.
+  Phones/tablets: stage fills the real viewport edge-to-edge — no letterboxing.
+  Browser chrome shortens height and makes the viewport "wider" than 1170×2532,
+  which is exactly what caused the black side bars on deployed mobile.
 */
 .app-shell {
-  width: 100vw;
+  width: 100%;
+  min-height: 100%;
   height: 100dvh;
   height: 100svh;
   display: grid;
@@ -66,7 +69,6 @@ img {
 }
 
 .phone-stage {
-  /* Uniform fit: largest frame with design aspect that fits the viewport */
   --design-w: 1170;
   --design-h: 2532;
   width: min(100vw, calc(100dvh * var(--design-w) / var(--design-h)));
@@ -78,14 +80,38 @@ img {
   overflow: hidden;
   background: #0b1f17;
   isolation: isolate;
+  container-type: size;
 }
 
-@media (max-width: 480px) {
+/*
+  Full-bleed on every phone / phablet / tablet, and any touch-primary device.
+  Covers common CSS widths: 320–430 (phones), 600–820 (foldables / large
+  phones), 768–1024 (tablets). Height uses dvh so the stage tracks the
+  visible viewport as mobile browser chrome shows/hides.
+*/
+@media (max-width: 1024px), (hover: none) and (pointer: coarse) {
+  .app-shell {
+    place-items: stretch;
+    width: 100%;
+    height: 100dvh;
+    /* Prefer dynamic viewport when available; fall back to small then large */
+    height: 100svh;
+    height: 100dvh;
+  }
+
   .phone-stage {
-    /* On phones, prefer filling height when aspect matches; still uniform */
-    width: min(100vw, calc(100svh * 1170 / 2532));
-    height: min(100svh, calc(100vw * 2532 / 1170));
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    max-height: none;
+    aspect-ratio: auto;
     border-radius: 0;
+  }
+
+  /* Stretch art to the live stage so % hotspots stay aligned with the PNG */
+  .art-screen__img,
+  .flow-screen__art {
+    object-fit: fill;
   }
 }
 
