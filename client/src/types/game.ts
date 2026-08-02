@@ -12,6 +12,7 @@ export type ScreenId =
   | 'boast'
   | 'tournaments'
   | 'profile'
+  | 'settings'
 
 export type CosmeticCategory = 'knife' | 'fruit' | 'trail' | 'background'
 export type Rarity = 'Common' | 'Rare' | 'Epic' | 'Legendary'

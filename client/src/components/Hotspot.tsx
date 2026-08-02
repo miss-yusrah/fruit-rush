@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, MouseEvent, ReactNode } from 'react'
+import { audio } from '../audio'
 
 interface HotspotProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   /** top % of design frame */
@@ -11,6 +12,8 @@ interface HotspotProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   height: number
   label: string
   children?: ReactNode
+  /** Skip the wood-tap UI sound (rare). */
+  silent?: boolean
 }
 
 /** Invisible hit target positioned in % of the art frame — keeps visuals = design PNG. */
@@ -22,8 +25,17 @@ export function Hotspot({
   label,
   className = '',
   children,
+  silent = false,
+  onClick,
   ...rest
 }: HotspotProps) {
+  const handleClick = (e: MouseEvent<HTMLButtonElement>) => {
+    if (!silent) {
+      void audio.unlock().then(() => audio.playUi('tap'))
+    }
+    onClick?.(e)
+  }
+
   return (
     <button
       type="button"
@@ -35,6 +47,7 @@ export function Hotspot({
         height: `${height}%`,
       }}
       aria-label={label}
+      onClick={handleClick}
       {...rest}
     >
       {children}

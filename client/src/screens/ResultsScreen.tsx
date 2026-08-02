@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { audio } from '../audio'
 import { designArt } from '../assets/designs'
 import type { GameSessionResult } from '../types/game'
 
@@ -9,6 +11,13 @@ interface ResultsScreenProps {
   onHome: () => void
 }
 
+function endTitle(result: GameSessionResult): { title: string; cue: 'nice' | 'juicy' | 'rush' | 'close' } {
+  if (result.score <= 0) return { title: 'SO CLOSE', cue: 'close' }
+  if (result.isPersonalBest) return { title: 'RUSH COMPLETE!', cue: 'rush' }
+  if (result.comboHighwater >= 8) return { title: 'JUICY RUN!', cue: 'juicy' }
+  return { title: 'NICE SLICE!', cue: 'nice' }
+}
+
 export function ResultsScreen({
   result,
   personalBest,
@@ -18,6 +27,11 @@ export function ResultsScreen({
 }: ResultsScreenProps) {
   const sliced = result.score > 0
   const rewardCoins = Math.floor(result.score / 10)
+  const { title, cue } = endTitle(result)
+
+  useEffect(() => {
+    void audio.unlock().then(() => audio.playGameOver(cue))
+  }, [cue])
 
   return (
     <section className="flow-screen results-screen">
@@ -32,9 +46,7 @@ export function ResultsScreen({
 
       <div className="flow-card results-screen__card">
         <p className="results-screen__mode">{result.mode.toUpperCase()}</p>
-        <h2 className="display results-screen__title">
-          {result.isPersonalBest ? 'NEW BEST!' : sliced ? 'SLICED!' : 'SO CLOSE'}
-        </h2>
+        <h2 className="display results-screen__title">{title}</h2>
 
         <p className="results-screen__score">{result.score.toLocaleString()}</p>
         {result.isPersonalBest ? (
@@ -61,15 +73,36 @@ export function ResultsScreen({
         </dl>
 
         <div className="results-screen__actions">
-          <button type="button" className="btn-primary" onClick={onPlayAgain}>
+          <button
+            type="button"
+            className="btn-primary"
+            onClick={() => {
+              audio.playUi('pop')
+              onPlayAgain()
+            }}
+          >
             Play again
           </button>
           {sliced && (
-            <button type="button" className="btn-secondary" onClick={onBoast}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                audio.playUi('pop')
+                onBoast()
+              }}
+            >
               Boast it
             </button>
           )}
-          <button type="button" className="btn-ghost" onClick={onHome}>
+          <button
+            type="button"
+            className="btn-ghost"
+            onClick={() => {
+              audio.playUi('tap')
+              onHome()
+            }}
+          >
             Home
           </button>
         </div>

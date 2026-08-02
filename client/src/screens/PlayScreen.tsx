@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { audio } from '../audio'
 import { designArt } from '../assets/designs'
 import { FruitRushGame } from '../game/FruitRushGame'
 import type { GameEndPayload, GameHudState } from '../game/types'
@@ -70,6 +71,7 @@ export function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
     timeLeft: MODE_CONFIG[mode].duration,
     lives: Math.min(MODE_CONFIG[mode].lives, 3),
   })
+  const [musicOn, setMusicOn] = useState(() => audio.isMusicEnabled)
   const portrait = usePortrait()
 
   useEffect(() => {
@@ -77,6 +79,7 @@ export function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
     if (!host) return
 
     let cancelled = false
+    void audio.unlock()
     const game = new FruitRushGame({
       host,
       mode,
@@ -141,8 +144,30 @@ export function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
         </div>
 
         <div className="play-hud__meta">
-          <span />
-          <button type="button" className="play-hud__exit" onClick={onExit}>
+          <button
+            type="button"
+            className="play-hud__mute"
+            aria-label={musicOn ? 'Turn game music off' : 'Turn game music on'}
+            onClick={() => {
+              void audio.unlock().then(() => {
+                const next = !audio.isMusicEnabled
+                audio.setMusicEnabled(next)
+                setMusicOn(next)
+                if (next) audio.startMusic()
+                else audio.playUi('tap')
+              })
+            }}
+          >
+            {musicOn ? 'Music on' : 'Music off'}
+          </button>
+          <button
+            type="button"
+            className="play-hud__exit"
+            onClick={() => {
+              audio.playUi('tap')
+              onExit()
+            }}
+          >
             Exit
           </button>
         </div>
@@ -151,7 +176,7 @@ export function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
       {hud.status === 'countdown' && (
         <div className="play-countdown" aria-live="polite">
           <span className="display">
-            {hud.countdown > 0.3 ? Math.ceil(hud.countdown) : 'SLASH'}
+            {hud.countdown > 0.3 ? Math.ceil(hud.countdown) : 'SLICE!'}
           </span>
           <span className="play-countdown__info">{blurb.info}</span>
           <span className="play-countdown__hint">{blurb.hint}</span>
