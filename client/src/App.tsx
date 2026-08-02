@@ -72,9 +72,15 @@ function screenFromPath(pathname: string): ScreenId | null {
 function initialScreen(): ScreenId {
   const fromPath = screenFromPath(window.location.pathname)
   if (!fromPath) return 'splash'
+  // Settings is a modal now — land on home if someone opens /settings cold.
+  if (fromPath === 'settings') return 'home'
   // These need an in-memory game result, which a fresh load never has.
   if (fromPath === 'results' || fromPath === 'boast') return 'home'
   return fromPath
+}
+
+function initialSettingsOpen(): boolean {
+  return window.location.pathname === SCREEN_PATHS.settings
 }
 
 export default function App() {
@@ -89,6 +95,7 @@ export default function App() {
   const [mintedId, setMintedId] = useState<number | null>(null)
   const [minting, setMinting] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(initialSettingsOpen)
 
   const showToast = useCallback((message: string) => {
     setToast(message)
@@ -97,10 +104,25 @@ export default function App() {
 
   const { closeMenu } = wallet
 
+  const openSettings = useCallback(() => {
+    closeMenu()
+    setSettingsOpen(true)
+  }, [closeMenu])
+
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false)
+  }, [])
+
   /** Navigate to a screen and keep the browser URL in sync. */
   const navigate = useCallback(
     (next: ScreenId, opts: { replace?: boolean } = {}) => {
       closeMenu()
+      setSettingsOpen(false)
+      // Settings is a popup, not a route destination.
+      if (next === 'settings') {
+        setSettingsOpen(true)
+        return
+      }
       const path = SCREEN_PATHS[next]
       if (window.location.pathname !== path) {
         if (opts.replace) window.history.replaceState(null, '', path)
@@ -120,11 +142,11 @@ export default function App() {
   }, [])
 
   // Browsers require a user gesture before audio can start — unlock on first tap,
-  // then start menu music if the player left Game Music on.
+  // then start the catchy menu theme if Game Music is on.
   useEffect(() => {
     const unlock = () => {
       void audio.unlock().then(() => {
-        if (audio.isMusicEnabled) audio.startMusic()
+        if (audio.isMusicEnabled) audio.enterMenu()
       })
     }
     window.addEventListener('pointerdown', unlock, { once: true })
@@ -135,11 +157,52 @@ export default function App() {
     }
   }, [])
 
+  // Route the two dance grooves by section; leave play audio alone.
+  useEffect(() => {
+    if (!audio.isUnlocked || !audio.isMusicEnabled) return
+    if (screen === 'play') return
+    // Results / boast keep the party going with the main menu groove.
+    if (
+      screen === 'results' ||
+      screen === 'boast' ||
+      screen === 'home' ||
+      screen === 'modes' ||
+      screen === 'connect' ||
+      screen === 'profile' ||
+      screen === 'onboarding' ||
+      screen === 'splash'
+    ) {
+      if (audio.currentTheme !== 'menu') audio.enterMenu()
+      return
+    }
+    // Shop & tournaments get the hotter alternate dance groove.
+    if (screen === 'shop' || screen === 'tournaments') {
+      if (audio.currentTheme !== 'hype') audio.enterHype(600)
+    }
+  }, [screen])
+
+  // Esc closes the settings popup.
+  useEffect(() => {
+    if (!settingsOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeSettings()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [settingsOpen, closeSettings])
+
   // Browser/hardware back and forward buttons.
   useEffect(() => {
     const onPopState = () => {
       closeMenu()
+      setSettingsOpen(false)
       const next = screenFromPath(window.location.pathname) ?? 'home'
+      if (next === 'settings') {
+        setScreen('home')
+        setSettingsOpen(true)
+        window.history.replaceState(null, '', SCREEN_PATHS.home)
+        return
+      }
       if ((next === 'results' || next === 'boast') && !lastResult) {
         window.history.replaceState(null, '', SCREEN_PATHS.home)
         setScreen('home')
@@ -196,6 +259,11 @@ export default function App() {
         durationSeconds: payload.durationSeconds,
         timestamp: Date.now(),
         isPersonalBest,
+        fruitsSliced: payload.fruitsSliced,
+        fruitsMissed: payload.fruitsMissed,
+        bombsHit: payload.bombsHit,
+        criticalSlices: payload.criticalSlices,
+        accuracy: payload.accuracy,
       })
       setMintedId(null)
       // Replace /play in history so Back from results returns to modes, not a new game.
@@ -205,15 +273,17 @@ export default function App() {
   )
 
   const showWallet =
-    screen === 'home' ||
-    screen === 'shop' ||
-    screen === 'tournaments' ||
-    screen === 'profile' ||
-    screen === 'boast' ||
-    (wallet.menuOpen && screen !== 'connect' && screen !== 'settings')
+    !settingsOpen &&
+    (screen === 'home' ||
+      screen === 'shop' ||
+      screen === 'tournaments' ||
+      screen === 'profile' ||
+      screen === 'boast' ||
+      (wallet.menuOpen && screen !== 'connect'))
 
   const showSettingsChip =
-    screen === 'home' || screen === 'profile' || screen === 'shop' || screen === 'tournaments'
+    !settingsOpen &&
+    (screen === 'home' || screen === 'profile' || screen === 'shop' || screen === 'tournaments')
 
   return (
     <PhoneStage>
@@ -281,6 +351,8 @@ export default function App() {
           onPlayAgain={() => go('play')}
           onBoast={() => go('boast')}
           onHome={() => go('home')}
+          onShop={() => go('shop')}
+          onToast={showToast}
         />
       )}
 
@@ -288,7 +360,7 @@ export default function App() {
         <ShopScreen
           onBuy={(name) => {
             if (!wallet.requireConnect()) {
-              showToast('Connect wallet to buy')
+              showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to buy')
               return
             }
             showToast(`Checkout stub · ${name}`)
@@ -301,11 +373,12 @@ export default function App() {
         <TournamentScreen
           onEnter={(id) => {
             if (!wallet.requireConnect()) {
-              showToast('Connect wallet to enter')
+              showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to enter')
               return
             }
-            showToast(`Entered ${id} · cUSD stub`)
+            showToast(`Entered ${id}`)
             setMode('Tournament')
+            void audio.unlock().then(() => audio.enterGameplay())
             go('play')
           }}
           onNavigate={go}
@@ -318,14 +391,14 @@ export default function App() {
           minting={minting}
           onMint={() => {
             if (!wallet.requireConnect()) {
-              showToast('Connect wallet to mint')
+              showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to save your boast')
               return
             }
             setMinting(true)
             window.setTimeout(() => {
               setMintedId(Math.floor(1000 + Math.random() * 9000))
               setMinting(false)
-              showToast('Boast minted on Celo (demo)')
+              showToast('Boast saved (demo)')
             }, 900)
           }}
           onShare={async () => {
@@ -351,7 +424,7 @@ export default function App() {
 
       {screen === 'profile' && <ProfileScreen onPlay={() => go('modes')} onNavigate={go} />}
 
-      {screen === 'settings' && <SettingsScreen onBack={() => go('home')} />}
+      {settingsOpen && <SettingsScreen onClose={closeSettings} />}
 
       {showSettingsChip && (
         <button
@@ -359,8 +432,8 @@ export default function App() {
           className="settings-chip"
           aria-label="Settings"
           onClick={() => {
-            void audio.unlock().then(() => audio.playUi('tap'))
-            go('settings')
+            void audio.unlock().then(() => audio.playUi('open'))
+            openSettings()
           }}
         >
           <span className="settings-chip__icon" aria-hidden />

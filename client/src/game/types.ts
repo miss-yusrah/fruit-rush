@@ -33,6 +33,11 @@ export interface GameEndPayload {
   comboHighwater: number
   durationSeconds: number
   mode: GameMode
+  fruitsSliced: number
+  fruitsMissed: number
+  bombsHit: number
+  criticalSlices: number
+  accuracy: number
 }
 
 export const MODE_CONFIG: Record<

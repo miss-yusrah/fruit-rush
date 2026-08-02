@@ -18,15 +18,15 @@ export function BoastScreen({
   minting = false,
 }: BoastScreenProps) {
   return (
-    <ArtScreen src={designArt.boast} alt="Prove it on-chain">
-      {/* MINT BOAST button measured at 77.5–83%; Share ~86–90; Not Now ~92–96 */}
+    <ArtScreen src={designArt.boast} alt="Boast your score">
+      {/* Boast CTA measured at 77.5–83%; Share ~86–90; Not Now ~92–96 */}
       {mintedId == null ? (
         <Hotspot
           top={77.5}
           left={20}
           width={60}
           height={6}
-          label={minting ? 'Minting' : 'Mint Boast'}
+          label={minting ? 'Saving boast…' : 'Save boast'}
           disabled={minting}
           onClick={onMint}
         />

@@ -1,1 +1,9 @@
-export { audio, AudioManager } from './AudioManager'
+export {
+  audio,
+  AudioManager,
+  type AudioChannel,
+  type AudioSettings,
+  type MusicTheme,
+  type UiCue,
+} from './AudioManager'
+export type { SpecialFruit } from './fruitVoices'

@@ -18,6 +18,8 @@ import {
   type GameEndPayload,
   type GameHudState,
 } from './types'
+import { createWoodTexture } from './woodBackground'
+import { createJuiceStainTexture } from './juiceStain'
 
 import watermelonUrl from '../assets/fruits/watermelon.png'
 import watermelonHalfUrl from '../assets/fruits/watermelon-half.png'
@@ -54,18 +56,22 @@ interface FruitSpec {
   weight: number
 }
 
+/** Arcade juice / stain colors — vivid enough to read on dark wood. */
 const FRUIT_SPECS: Record<EdibleKind, FruitSpec> = {
-  watermelon: { whole: watermelonUrl, half: watermelonHalfUrl, radius: 62, points: 15, juice: 0xff4d4d, seeds: 5, weight: 10 },
-  orange: { whole: orangeUrl, half: orangeHalfUrl, radius: 48, points: 10, juice: 0xff9f1c, seeds: 0, weight: 12 },
-  apple: { whole: appleUrl, half: appleHalfUrl, radius: 48, points: 10, juice: 0xfff2c8, seeds: 2, weight: 12 },
-  coconut: { whole: coconutUrl, half: coconutHalfUrl, radius: 52, points: 14, juice: 0xf7f3ec, seeds: 0, weight: 7 },
-  pear: { whole: pearUrl, half: pearHalfUrl, radius: 50, points: 10, juice: 0xf3ecb0, seeds: 2, weight: 10 },
-  pineapple: { whole: pineappleUrl, half: pineappleHalfUrl, radius: 58, points: 14, juice: 0xffd166, seeds: 0, weight: 8 },
-  mango: { whole: mangoUrl, half: mangoHalfUrl, radius: 50, points: 12, juice: 0xffb703, seeds: 0, weight: 10 },
-  kiwi: { whole: kiwiUrl, half: kiwiHalfUrl, radius: 42, points: 12, juice: 0x9acd32, seeds: 4, weight: 9 },
-  lemon: { whole: lemonUrl, half: lemonHalfUrl, radius: 42, points: 10, juice: 0xffe86b, seeds: 2, weight: 10 },
-  passionfruit: { whole: passionfruitUrl, half: passionfruitHalfUrl, radius: 40, points: 16, juice: 0xf4a423, seeds: 6, weight: 5 },
+  watermelon: { whole: watermelonUrl, half: watermelonHalfUrl, radius: 62, points: 15, juice: 0xc62828, seeds: 5, weight: 10 },
+  orange: { whole: orangeUrl, half: orangeHalfUrl, radius: 48, points: 10, juice: 0xff8c1a, seeds: 0, weight: 12 },
+  apple: { whole: appleUrl, half: appleHalfUrl, radius: 48, points: 10, juice: 0xff6b6b, seeds: 2, weight: 12 },
+  coconut: { whole: coconutUrl, half: coconutHalfUrl, radius: 52, points: 14, juice: 0xf5f0e6, seeds: 0, weight: 7 },
+  pear: { whole: pearUrl, half: pearHalfUrl, radius: 50, points: 10, juice: 0xe8e090, seeds: 2, weight: 10 },
+  pineapple: { whole: pineappleUrl, half: pineappleHalfUrl, radius: 58, points: 14, juice: 0xffd54a, seeds: 0, weight: 8 },
+  mango: { whole: mangoUrl, half: mangoHalfUrl, radius: 50, points: 12, juice: 0xffb300, seeds: 0, weight: 10 },
+  kiwi: { whole: kiwiUrl, half: kiwiHalfUrl, radius: 42, points: 12, juice: 0x7cb342, seeds: 4, weight: 9 },
+  lemon: { whole: lemonUrl, half: lemonHalfUrl, radius: 42, points: 10, juice: 0xffe566, seeds: 2, weight: 10 },
+  passionfruit: { whole: passionfruitUrl, half: passionfruitHalfUrl, radius: 40, points: 16, juice: 0xf0a020, seeds: 6, weight: 5 },
 }
+
+/** Cap persistent board stains so long sessions stay smooth. */
+const MAX_STAINS = 52
 
 const EDIBLE_KINDS = Object.keys(FRUIT_SPECS) as EdibleKind[]
 const TOTAL_WEIGHT = EDIBLE_KINDS.reduce((s, k) => s + FRUIT_SPECS[k].weight, 0)
@@ -100,6 +106,8 @@ interface FruitEntity {
   vy: number
   spin: number
   alive: boolean
+  /** Accrues while a bomb is airborne for subtle fuse ticks. */
+  tickAcc?: number
 }
 
 interface HalfEntity {
@@ -125,9 +133,15 @@ interface Particle {
 }
 
 interface SplatEntity {
-  view: Graphics
+  view: Sprite
+  texture: Texture
+  baseAlpha: number
   life: number
   maxLife: number
+  /** Slow drip down the wooden board. */
+  vy: number
+  x: number
+  y: number
 }
 
 interface FloatText {
@@ -158,6 +172,8 @@ interface FruitRushGameOptions {
 export class FruitRushGame {
   private app: Application | null = null
   private world = new Container()
+  private woodSprite: Sprite | null = null
+  private woodTexture: Texture | null = null
   private splatLayer = new Container()
   private fruitLayer = new Container()
   private particleLayer = new Container()
@@ -191,6 +207,8 @@ export class FruitRushGame {
   private waveTimer = 0.4
   private frenzyTimer = 0
   private inFrenzy = false
+  /** True while the hype dance groove is riding a hot combo. */
+  private hypeFromCombo = false
   /** Fruits launched since the last bomb — drives the guaranteed cadence. */
   private sinceBomb = 0
   /** Launches since the last non-bomb hazard (spike / ice). */
@@ -203,6 +221,10 @@ export class FruitRushGame {
   private burstTimer = 0
   private destroyed = false
   private sessionStart = 0
+  private fruitsSliced = 0
+  private fruitsMissed = 0
+  private bombsHit = 0
+  private criticalSlices = 0
 
   private readonly mode: GameMode
   private readonly config: (typeof MODE_CONFIG)[GameMode]
@@ -230,7 +252,8 @@ export class FruitRushGame {
     const dprCap = coarse ? 1.5 : 2
     await app.init({
       resizeTo: this.host,
-      backgroundAlpha: 0,
+      background: '#3a2416',
+      backgroundAlpha: 1,
       antialias: !coarse,
       resolution: Math.min(window.devicePixelRatio || 1, dprCap),
       autoDensity: true,
@@ -240,6 +263,8 @@ export class FruitRushGame {
     app.ticker.maxFPS = 60
 
     await this.loadTextures()
+    // Asset load often leaves AudioContext suspended — wake it before countdown.
+    await audio.unlock()
 
     if (this.destroyed) {
       app.destroy(true)
@@ -253,6 +278,7 @@ export class FruitRushGame {
     app.canvas.style.touchAction = 'none'
     app.canvas.style.display = 'block'
 
+    this.mountWoodBackground()
     this.world.addChild(this.splatLayer, this.fruitLayer, this.particleLayer, this.textLayer)
     app.stage.addChild(this.world, this.trailGfx, this.flashGfx)
 
@@ -260,9 +286,34 @@ export class FruitRushGame {
     window.addEventListener('pointermove', this.boundPointerMove)
     window.addEventListener('pointerup', this.boundPointerUp)
     window.addEventListener('pointercancel', this.boundPointerUp)
+    app.renderer.on('resize', this.boundResize)
 
     this.emitHud()
     app.ticker.add((ticker) => this.update(ticker.deltaMS / 1000))
+  }
+
+  private boundResize = () => this.layoutWoodBackground()
+
+  /** Cutting-board wall under stains — shakes with the world. */
+  private mountWoodBackground() {
+    this.woodTexture = createWoodTexture()
+    const sprite = new Sprite(this.woodTexture)
+    sprite.eventMode = 'none'
+    this.woodSprite = sprite
+    this.world.addChildAt(sprite, 0)
+    this.layoutWoodBackground()
+  }
+
+  private layoutWoodBackground() {
+    if (!this.app || !this.woodSprite || !this.woodTexture) return
+    const w = this.app.screen.width
+    const h = this.app.screen.height
+    const tw = this.woodTexture.width
+    const th = this.woodTexture.height
+    const scale = Math.max(w / tw, h / th)
+    this.woodSprite.scale.set(scale)
+    this.woodSprite.x = (w - tw * scale) * 0.5
+    this.woodSprite.y = (h - th * scale) * 0.5
   }
 
   private async loadTextures() {
@@ -297,10 +348,18 @@ export class FruitRushGame {
     window.removeEventListener('pointermove', this.boundPointerMove)
     window.removeEventListener('pointerup', this.boundPointerUp)
     window.removeEventListener('pointercancel', this.boundPointerUp)
+    for (const s of this.splats) {
+      s.texture.destroy(true)
+    }
+    this.splats = []
     if (this.app) {
+      this.app.renderer.off('resize', this.boundResize)
       this.app.destroy(true, { children: true })
       this.app = null
     }
+    this.woodTexture?.destroy(true)
+    this.woodTexture = null
+    this.woodSprite = null
     this.host.replaceChildren()
   }
 
@@ -343,7 +402,9 @@ export class FruitRushGame {
         this.sessionStart = performance.now()
         this.waveTimer = 0.35
         audio.playCountdown('slice')
-        audio.startMusic()
+        // Gameplay bed + ambience already crossfaded in on mode select;
+        // countdown callout nudges the quiet arena theme fully in.
+        if (audio.currentTheme !== 'gameplay') audio.playTheme('gameplay', 400)
       }
       this.emitHud()
       return
@@ -375,6 +436,7 @@ export class FruitRushGame {
         if (this.comboTimer <= 0) {
           this.combo = 0
           audio.setComboIntensity(0)
+          this.dropHypeIfNeeded()
         }
       }
       if (this.burstTimer > 0) {
@@ -403,9 +465,12 @@ export class FruitRushGame {
       if (!this.inFrenzy && this.frenzyTimer > 12) {
         this.inFrenzy = true
         this.frenzyTimer = 0
+        audio.enterHype(400)
       } else if (this.inFrenzy && this.frenzyTimer > 5) {
         this.inFrenzy = false
         this.frenzyTimer = 0
+        // Stay on hype if a hot combo is still rolling.
+        if (!this.hypeFromCombo) audio.playTheme('gameplay', 500)
       }
     }
 
@@ -489,9 +554,11 @@ export class FruitRushGame {
     if (kind === 'bomb') {
       this.sinceBomb = 0
       this.sinceHazard += 1
+      audio.playBombAppear()
     } else if (kind === 'spike' || kind === 'ice') {
       this.sinceHazard = 0
       this.sinceBomb += 1
+      if (kind === 'ice') audio.playIceAppear()
     } else {
       this.sinceBomb += 1
       this.sinceHazard += 1
@@ -543,6 +610,7 @@ export class FruitRushGame {
       vy: -vyMag,
       spin: (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 2.8),
       alive: true,
+      tickAcc: kind === 'bomb' ? 0 : undefined,
     })
   }
 
@@ -597,21 +665,27 @@ export class FruitRushGame {
       fruit.view.y = fruit.y
       fruit.view.rotation += fruit.spin * dt
 
+      if (fruit.kind === 'bomb' && fruit.tickAcc != null) {
+        fruit.tickAcc += dt
+        if (fruit.tickAcc >= 0.24) {
+          fruit.tickAcc = 0
+          audio.playBombTick()
+        }
+      }
+
       if (fruit.vy > 0 && fruit.y - fruit.radius > h + 60) {
         fruit.alive = false
         fruit.view.destroy()
         // Hazards falling away are free — only missing edible fruit costs a life.
-        if (
-          !isHazard(fruit.kind) &&
-          this.mode !== 'Zen' &&
-          this.elapsed > 3.5 &&
-          this.endDelay < 0
-        ) {
-          this.lives -= 1
-          this.combo = 0
-          if (this.lives <= 0) {
-            this.finish()
-            return
+        if (!isHazard(fruit.kind) && this.elapsed > 3.5 && this.endDelay < 0) {
+          this.fruitsMissed += 1
+          if (this.mode !== 'Zen') {
+            this.lives -= 1
+            this.combo = 0
+            if (this.lives <= 0) {
+              this.finish()
+              return
+            }
           }
         }
       }
@@ -663,11 +737,38 @@ export class FruitRushGame {
   private stepSplats(dt: number) {
     for (const s of this.splats) {
       s.life -= dt
-      const k = Math.max(0, s.life / s.maxLife)
-      s.view.alpha = k * 0.4
-      if (s.life <= 0) s.view.destroy()
+      s.y += s.vy * dt
+      s.view.y = s.y
+      // Stretch slightly as juice runs down the board
+      const age = 1 - s.life / s.maxLife
+      s.view.scale.y = s.view.scale.x * (1 + age * 0.35)
+
+      // Hold full wetness, then fade out as the drip dries / runs off
+      const fadeStart = s.maxLife * 0.45
+      if (s.life > fadeStart) {
+        s.view.alpha = s.baseAlpha
+      } else if (s.life > 0) {
+        s.view.alpha = s.baseAlpha * (s.life / fadeStart)
+      }
+
+      if (s.life <= 0) {
+        s.view.destroy()
+        s.texture.destroy(true)
+      }
     }
     this.splats = this.splats.filter((s) => s.life > 0)
+  }
+
+  /** Retire oldest stains first when the board gets too crowded. */
+  private cullOldStains() {
+    const overflow = this.splats.length - MAX_STAINS
+    if (overflow <= 0) return
+    for (let i = 0; i < overflow; i++) {
+      const s = this.splats[i]
+      // Speed up drying so the oldest clear out smoothly
+      if (s.life > 0.6) s.life = 0.6
+      s.maxLife = Math.max(s.maxLife, 0.6)
+    }
   }
 
   private stepTexts(dt: number) {
@@ -707,6 +808,8 @@ export class FruitRushGame {
   // ------------------------------------------------------------- input
 
   private onPointerDown(e: PointerEvent) {
+    // Phones suspend AudioContext after async texture load — re-kick on every swipe.
+    audio.kick()
     if (this.status !== 'playing') return
     const p = this.toLocal(e)
     this.slicing = true
@@ -717,7 +820,9 @@ export class FruitRushGame {
   private onPointerMove(e: PointerEvent) {
     if (!this.slicing || this.status !== 'playing') return
     const p = this.toLocal(e)
+    const speed = Math.hypot(p.x - this.lastPointer.x, p.y - this.lastPointer.y)
     this.trail.push({ ...p, t: performance.now() })
+    if (speed > 8) audio.playBlade(speed)
     this.trySlice(this.lastPointer.x, this.lastPointer.y, p.x, p.y)
     this.lastPointer = p
   }
@@ -785,10 +890,13 @@ export class FruitRushGame {
       this.spawnJuice(fruit.x, fruit.y, spec, angle)
       this.spawnSplat(fruit.x, fruit.y, spec)
 
+      this.fruitsSliced += 1
       this.combo += 1
       this.comboHigh = Math.max(this.comboHigh, this.combo)
       this.comboTimer = 1.5
-      this.score += spec.points * comboMultiplier(this.combo)
+      const mult = comboMultiplier(this.combo)
+      if (mult >= 3) this.criticalSlices += 1
+      this.score += spec.points * mult
 
       this.burstCount += 1
       this.burstTimer = 0.4
@@ -798,11 +906,28 @@ export class FruitRushGame {
 
       audio.playSlice(fruit.kind)
       audio.playCombo(this.combo)
+      this.liftHypeForCombo()
 
       this.announceSlice(fruit.x, fruit.y)
     }
 
     this.fruits = this.fruits.filter((f) => f.alive)
+  }
+
+  /** Hot streak (8+) swaps the quiet bed for the hype dance groove. */
+  private liftHypeForCombo() {
+    if (this.combo >= 8 && !this.hypeFromCombo && !this.inFrenzy) {
+      this.hypeFromCombo = true
+      audio.enterHype(350)
+    }
+  }
+
+  private dropHypeIfNeeded() {
+    if (!this.hypeFromCombo) return
+    this.hypeFromCombo = false
+    if (!this.inFrenzy && this.status === 'playing') {
+      audio.playTheme('gameplay', 450)
+    }
   }
 
   private announceSlice(x: number, y: number) {
@@ -819,6 +944,7 @@ export class FruitRushGame {
   }
 
   private explodeBomb(fruit: FruitEntity) {
+    this.bombsHit += 1
     this.flash = 1
     this.shake = 22
     this.freeze = 0.12
@@ -850,6 +976,7 @@ export class FruitRushGame {
     this.combo = 0
     this.lives -= 1
     audio.playSpike()
+    this.dropHypeIfNeeded()
     for (let i = 0; i < 14; i++) {
       const angle = Math.random() * Math.PI * 2
       const speed = 120 + Math.random() * 280
@@ -874,6 +1001,7 @@ export class FruitRushGame {
     this.combo = 0
     this.score = Math.max(0, this.score - 40)
     audio.playIce()
+    this.dropHypeIfNeeded()
     for (let i = 0; i < 18; i++) {
       const angle = Math.random() * Math.PI * 2
       const speed = 90 + Math.random() * 240
@@ -961,11 +1089,11 @@ export class FruitRushGame {
   }
 
   private spawnJuice(x: number, y: number, spec: FruitSpec, sliceAngle: number) {
-    // Juice sprays mostly perpendicular to the swipe.
+    // Juice sprays mostly perpendicular to the swipe, then fades — stains stay.
     const nx = -Math.sin(sliceAngle)
     const ny = Math.cos(sliceAngle)
     const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
-    const drops = coarse ? 7 : 14
+    const drops = coarse ? 10 : 18
     const seeds = coarse ? Math.min(2, spec.seeds) : spec.seeds
     for (let i = 0; i < drops; i++) {
       const side = Math.random() < 0.5 ? -1 : 1
@@ -973,15 +1101,15 @@ export class FruitRushGame {
       const dirX = nx * side + Math.cos(sliceAngle) * spread
       const dirY = ny * side + Math.sin(sliceAngle) * spread
       const len = Math.hypot(dirX, dirY) || 1
-      const speed = 90 + Math.random() * 260
+      const speed = 90 + Math.random() * 280
       this.pushParticle(
         x,
         y,
         (dirX / len) * speed,
         (dirY / len) * speed - 60,
         spec.juice,
-        2 + Math.random() * 3.6,
-        0.38 + Math.random() * 0.3,
+        2 + Math.random() * 4.2,
+        0.35 + Math.random() * 0.35,
       )
     }
     for (let i = 0; i < seeds; i++) {
@@ -1000,20 +1128,44 @@ export class FruitRushGame {
     }
   }
 
+  /**
+   * Soft wet juice mark on the board — drips down, then fades away.
+   * Sits on splatLayer (behind fruit).
+   */
   private spawnSplat(x: number, y: number, spec: FruitSpec) {
-    const g = new Graphics()
-    const blobs = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches ? 4 : 7
-    for (let i = 0; i < blobs; i++) {
-      const angle = Math.random() * Math.PI * 2
-      const dist = Math.random() * spec.radius * 0.9
-      g.circle(Math.cos(angle) * dist, Math.sin(angle) * dist, 5 + Math.random() * spec.radius * 0.4)
-    }
-    g.fill(spec.juice)
-    g.x = x
-    g.y = y
-    g.alpha = 0.4
-    this.splatLayer.addChild(g)
-    this.splats.push({ view: g, life: 0.8, maxLife: 0.8 })
+    const { texture } = createJuiceStainTexture(spec.juice, spec.radius)
+    const sprite = new Sprite(texture)
+    sprite.anchor.set(0.5)
+    sprite.x = x
+    sprite.y = y
+    sprite.rotation = (Math.random() - 0.5) * 0.7
+    sprite.scale.set(0.85 + Math.random() * 0.35)
+    sprite.eventMode = 'none'
+
+    const r = (spec.juice >> 16) & 0xff
+    const gCh = (spec.juice >> 8) & 0xff
+    const b = spec.juice & 0xff
+    const lum = (r * 0.3 + gCh * 0.59 + b * 0.11) / 255
+    const light = lum > 0.72
+    // Multiply so darker juices soak into wood; light juices stay visible
+    sprite.blendMode = light ? 'normal' : 'multiply'
+    const baseAlpha = light ? 0.72 + Math.random() * 0.2 : 0.78 + Math.random() * 0.18
+    sprite.alpha = baseAlpha
+
+    const life = 3.8 + Math.random() * 2.8
+    this.splatLayer.addChild(sprite)
+    this.splats.push({
+      view: sprite,
+      texture,
+      baseAlpha,
+      life,
+      maxLife: life,
+      // Slow gravity drip — heavier fruits drip a bit faster
+      vy: 18 + Math.random() * 28 + spec.radius * 0.12,
+      x,
+      y,
+    })
+    this.cullOldStains()
   }
 
   private spawnText(content: string, x: number, y: number, tint: number, size: number) {
@@ -1072,14 +1224,24 @@ export class FruitRushGame {
     if (this.status === 'ended') return
     this.status = 'ended'
     this.slicing = false
+    this.inFrenzy = false
+    this.hypeFromCombo = false
+    // Stop arena bed — ResultsScreen brings the dance menu theme back.
     audio.stopMusic()
     this.emitHud()
     const durationSeconds = Math.max(1, Math.round((performance.now() - this.sessionStart) / 1000))
+    const attempts = this.fruitsSliced + this.fruitsMissed
+    const accuracy = attempts === 0 ? 100 : Math.round((this.fruitsSliced / attempts) * 100)
     this.onEnd({
       score: this.score,
       comboHighwater: this.comboHigh,
       durationSeconds,
       mode: this.mode,
+      fruitsSliced: this.fruitsSliced,
+      fruitsMissed: this.fruitsMissed,
+      bombsHit: this.bombsHit,
+      criticalSlices: this.criticalSlices,
+      accuracy,
     })
   }
 }

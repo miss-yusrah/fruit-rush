@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { WagmiProvider } from 'wagmi'
 import App from './App'
 import './styles/global.css'
+import './styles/results.css'
 import { wagmiConfig } from './wallet/config'
 
 const queryClient = new QueryClient()

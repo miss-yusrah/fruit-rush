@@ -1,3 +1,4 @@
+import { audio } from '../audio'
 import { ArtScreen } from '../components/ArtScreen'
 import { Hotspot } from '../components/Hotspot'
 import { designArt } from '../assets/designs'
@@ -15,9 +16,28 @@ interface ModesScreenProps {
  *  Classic 35–50.5% · Zen 53–69% · Arcade 71–85.5%
  */
 export function ModesScreen({ guest = false, onBack, onSelect }: ModesScreenProps) {
+  const pick = (mode: GameMode) => {
+    // Unlock inside the mode-tap gesture, fade menu → arena whoosh + ambience.
+    void audio.unlock().then(() => {
+      audio.enterGameplay()
+    })
+    onSelect(mode)
+  }
+
   return (
     <ArtScreen src={designArt.modes} alt="Choose your cut">
-      <Hotspot top={2} left={1} width={14} height={6} label="Back" onClick={onBack} />
+          <Hotspot
+        top={2}
+        left={1}
+        width={14}
+        height={6}
+        label="Back"
+        silent
+        onClick={() => {
+          void audio.unlock().then(() => audio.playUi('close'))
+          onBack()
+        }}
+      />
 
       <Hotspot
         top={35}
@@ -25,7 +45,7 @@ export function ModesScreen({ guest = false, onBack, onSelect }: ModesScreenProp
         width={88}
         height={15.5}
         label="Classic"
-        onClick={() => onSelect('Classic')}
+        onClick={() => pick('Classic')}
       />
       <Hotspot
         top={53}
@@ -33,7 +53,7 @@ export function ModesScreen({ guest = false, onBack, onSelect }: ModesScreenProp
         width={88}
         height={16}
         label="Zen"
-        onClick={() => onSelect('Zen')}
+        onClick={() => pick('Zen')}
       />
       <Hotspot
         top={71}
@@ -41,12 +61,12 @@ export function ModesScreen({ guest = false, onBack, onSelect }: ModesScreenProp
         width={88}
         height={14.5}
         label="Arcade"
-        onClick={() => onSelect('Arcade')}
+        onClick={() => pick('Arcade')}
       />
 
       {guest && (
         <div className="modes-guest-note" role="note">
-          Playing as guest — connect a wallet for tournaments, the shop and rewards
+          Playing as guest — link MiniPay for tournaments, the shop and rewards
         </div>
       )}
     </ArtScreen>

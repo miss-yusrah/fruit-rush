@@ -17,13 +17,13 @@ const SLIDES = [
     key: 'own',
     glyph: '⚔️',
     title: 'Own your loot',
-    body: 'Blades, trails, and boasts live on Celo. Buy them with cUSD and they are yours for good.',
+    body: 'Blades, trails, and boasts stay with you. Grab them in the shop — once they’re yours, they’re yours.',
   },
   {
     key: 'compete',
     glyph: '🏆',
     title: 'Compete and earn',
-    body: 'Enter daily tournaments with real prize pools, climb the board, and mint your best runs.',
+    body: 'Jump into daily tournaments with real prize pools, climb the board, and boast your best runs.',
   },
 ] as const
 
