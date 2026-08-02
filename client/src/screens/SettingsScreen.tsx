@@ -1,19 +1,16 @@
 import { useState } from 'react'
 import { audio } from '../audio'
-import { designArt } from '../assets/designs'
-import { ArtScreen } from '../components/ArtScreen'
-import { Hotspot } from '../components/Hotspot'
+import '../styles/settings.css'
 
 interface SettingsScreenProps {
-  onBack: () => void
+  onClose: () => void
 }
 
 /**
- * Settings on the painted design asset.
- * Toggle hotspots are measured to the green ON pills in settings.png;
- * a live switch fills each hotspot so On/Off always moves with the tap.
+ * Settings popup — overlays whatever screen is already underneath,
+ * so the green orchard / shop / home art stays as the background.
  */
-export function SettingsScreen({ onBack }: SettingsScreenProps) {
+export function SettingsScreen({ onClose }: SettingsScreenProps) {
   const [sfx, setSfx] = useState(() => audio.isSfxEnabled)
   const [music, setMusic] = useState(() => audio.isMusicEnabled)
 
@@ -40,71 +37,76 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
       audio.setSfxEnabled(true)
       setSfx(true)
     }
+    audio.playUi('press')
     audio.playSlice('watermelon')
   }
 
+  const close = () => {
+    void audio.unlock().then(() => audio.playUi('close'))
+    onClose()
+  }
+
   return (
-    <ArtScreen src={designArt.settings} alt="Fruit Rush settings" className="settings-art">
-      <Hotspot top={1.5} left={1} width={14} height={6} label="Back" onClick={onBack} />
-
-      {/* Measured green toggle pills on settings.png */}
-      <Hotspot
-        top={50.3}
-        left={67.5}
-        width={15.5}
-        height={4.8}
-        label="Toggle sound effects"
-        silent
-        className="settings-switch-hit"
-        onClick={() => void toggleSfx()}
-      >
-        <span className={`settings-live-switch${sfx ? ' is-on' : ''}`} aria-hidden />
-      </Hotspot>
-
-      <Hotspot
-        top={61.7}
-        left={67.5}
-        width={15.5}
-        height={4.8}
-        label="Toggle game music"
-        silent
-        className="settings-switch-hit"
-        onClick={() => void toggleMusic()}
-      >
-        <span className={`settings-live-switch${music ? ' is-on' : ''}`} aria-hidden />
-      </Hotspot>
-
-      {/* Also allow tapping the whole label row */}
-      <Hotspot
-        top={49.5}
-        left={8}
-        width={58}
-        height={6.5}
-        label="Toggle sound effects row"
-        silent
-        onClick={() => void toggleSfx()}
-      />
-      <Hotspot
-        top={60.8}
-        left={8}
-        width={58}
-        height={6.5}
-        label="Toggle game music row"
-        silent
-        onClick={() => void toggleMusic()}
+    <section className="settings-screen" role="dialog" aria-modal="true" aria-label="Settings">
+      <button
+        type="button"
+        className="settings-screen__scrim"
+        aria-label="Close settings"
+        onClick={close}
       />
 
-      {/* Measured to the TEST A SLICE gold plank on settings.png */}
-      <Hotspot
-        top={76}
-        left={12.5}
-        width={75}
-        height={9}
-        label="Test a slice"
-        silent
-        className="settings-plank-hit"
-        onClick={() => void testSlice()}
-      />
-    </ArtScreen>
+      <div className="settings-screen__card">
+        <button
+          type="button"
+          className="settings-screen__back"
+          aria-label="Close"
+          onClick={close}
+        >
+          ‹
+        </button>
+
+        <p className="settings-screen__eyebrow">Fruit Rush</p>
+        <h1 className="settings-screen__title">Settings</h1>
+        <p className="settings-screen__blurb">Make it juicy. Or keep your own playlist.</p>
+
+        <div className="settings-rows" role="group" aria-label="Audio">
+          <button
+            type="button"
+            className={`settings-row${sfx ? ' is-on' : ''}`}
+            onClick={() => void toggleSfx()}
+            aria-pressed={sfx}
+          >
+            <span className="settings-row__copy">
+              <strong>Sound effects</strong>
+              <span>Slices, bombs, combos</span>
+            </span>
+            <span className={`settings-toggle${sfx ? ' is-on' : ''}`} aria-hidden>
+              <span className="settings-toggle__knob" />
+              <span className="settings-toggle__label">{sfx ? 'On' : 'Off'}</span>
+            </span>
+          </button>
+
+          <button
+            type="button"
+            className={`settings-row${music ? ' is-on' : ''}`}
+            onClick={() => void toggleMusic()}
+            aria-pressed={music}
+          >
+            <span className="settings-row__copy">
+              <strong>Game music</strong>
+              <span>Off for your own playlist</span>
+            </span>
+            <span className={`settings-toggle${music ? ' is-on' : ''}`} aria-hidden>
+              <span className="settings-toggle__knob" />
+              <span className="settings-toggle__label">{music ? 'On' : 'Off'}</span>
+            </span>
+          </button>
+        </div>
+
+        <button type="button" className="btn-primary settings-screen__cta" onClick={() => void testSlice()}>
+          Test a slice
+        </button>
+      </div>
+    </section>
   )
 }
