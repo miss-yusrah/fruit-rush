@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { audio } from '../audio'
-import { designArt } from '../assets/designs'
 import { FruitRushGame } from '../game/FruitRushGame'
 import type { GameEndPayload, GameHudState } from '../game/types'
 import { MODE_CONFIG, formatTimeLeft } from '../game/types'
@@ -111,13 +110,6 @@ export function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
 
   return (
     <section className={`art-screen play-screen${portrait ? ' play-screen--rotated' : ''}`}>
-      <img
-        className="art-screen__img play-screen__bg"
-        src={designArt.play}
-        alt=""
-        draggable={false}
-        aria-hidden
-      />
       <div className="play-screen__canvas" ref={hostRef} />
 
       <div className="play-hud">

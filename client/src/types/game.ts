@@ -48,6 +48,11 @@ export interface GameSessionResult {
   durationSeconds: number
   timestamp: number
   isPersonalBest: boolean
+  fruitsSliced: number
+  fruitsMissed: number
+  bombsHit: number
+  criticalSlices: number
+  accuracy: number
 }
 
 export interface PlayerProfile {

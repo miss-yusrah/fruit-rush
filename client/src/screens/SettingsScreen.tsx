@@ -94,11 +94,12 @@ export function SettingsScreen({ onBack }: SettingsScreenProps) {
         onClick={() => void toggleMusic()}
       />
 
+      {/* Measured to the TEST A SLICE gold plank on settings.png */}
       <Hotspot
-        top={72.2}
-        left={14}
-        width={72}
-        height={8.2}
+        top={76}
+        left={12.5}
+        width={75}
+        height={9}
         label="Test a slice"
         silent
         className="settings-plank-hit"

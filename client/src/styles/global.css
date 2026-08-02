@@ -398,7 +398,8 @@ img {
   position: fixed;
   inset: 0;
   z-index: 40;
-  background: #0b1f17;
+  /* Warm wood undertone while the procedural board boots */
+  background: #3a2416;
 }
 
 /*
@@ -414,15 +415,6 @@ img {
   height: 100vw;
   transform-origin: top left;
   transform: rotate(90deg) translateY(-100%);
-}
-
-.play-screen__bg {
-  object-fit: cover;
-  /* Exact design art, dimmed hard so the live fruit is the star —
-     the PNG has huge painted fruit that otherwise fights the game.
-     Scaled to crop the fake HUD baked into the PNG's edges. */
-  filter: brightness(0.34) saturate(0.75);
-  transform: scale(1.16);
 }
 
 .play-screen__canvas {

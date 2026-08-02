@@ -196,6 +196,11 @@ export default function App() {
         durationSeconds: payload.durationSeconds,
         timestamp: Date.now(),
         isPersonalBest,
+        fruitsSliced: payload.fruitsSliced,
+        fruitsMissed: payload.fruitsMissed,
+        bombsHit: payload.bombsHit,
+        criticalSlices: payload.criticalSlices,
+        accuracy: payload.accuracy,
       })
       setMintedId(null)
       // Replace /play in history so Back from results returns to modes, not a new game.
@@ -281,6 +286,8 @@ export default function App() {
           onPlayAgain={() => go('play')}
           onBoast={() => go('boast')}
           onHome={() => go('home')}
+          onShop={() => go('shop')}
+          onToast={showToast}
         />
       )}
 

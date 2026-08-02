@@ -1,7 +1,30 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { audio } from '../audio'
 import { designArt } from '../assets/designs'
+import {
+  computeRoundRewards,
+  headlineFor,
+  type RoundRewards,
+} from '../components/results/resultsRewards'
+import { buildMockLeaderboard } from '../data/leaderboard'
 import type { GameSessionResult } from '../types/game'
+import '../styles/results.css'
+
+const BONUS_ICON = {
+  daily: '◆',
+  combo: '✕',
+  accuracy: '◎',
+  speed: '›',
+  nobomb: '○',
+} as const
+
+const SHORT_LABEL = {
+  daily: 'Daily',
+  combo: 'Combo',
+  accuracy: 'Accuracy',
+  speed: 'Speed',
+  nobomb: 'No Bomb',
+} as const
 
 interface ResultsScreenProps {
   result: GameSessionResult
@@ -9,13 +32,8 @@ interface ResultsScreenProps {
   onPlayAgain: () => void
   onBoast: () => void
   onHome: () => void
-}
-
-function endTitle(result: GameSessionResult): { title: string; cue: 'nice' | 'juicy' | 'rush' | 'close' } {
-  if (result.score <= 0) return { title: 'SO CLOSE', cue: 'close' }
-  if (result.isPersonalBest) return { title: 'RUSH COMPLETE!', cue: 'rush' }
-  if (result.comboHighwater >= 8) return { title: 'JUICY RUN!', cue: 'juicy' }
-  return { title: 'NICE SLICE!', cue: 'nice' }
+  onShop?: () => void
+  onToast?: (message: string) => void
 }
 
 export function ResultsScreen({
@@ -25,54 +43,87 @@ export function ResultsScreen({
   onBoast,
   onHome,
 }: ResultsScreenProps) {
-  const sliced = result.score > 0
-  const rewardCoins = Math.floor(result.score / 10)
-  const { title, cue } = endTitle(result)
+  const youRank = useMemo(
+    () => buildMockLeaderboard(result.score).entries.find((e) => e.isYou)?.rank ?? 99,
+    [result.score],
+  )
+  const headline = headlineFor(result)
+  const [rewards, setRewards] = useState<RoundRewards | null>(null)
 
   useEffect(() => {
+    setRewards(computeRoundRewards(result, youRank))
+    const cue =
+      result.score <= 0
+        ? 'close'
+        : result.isPersonalBest
+          ? 'rush'
+          : result.comboHighwater >= 8
+            ? 'juicy'
+            : 'nice'
     void audio.unlock().then(() => audio.playGameOver(cue))
-  }, [cue])
+  }, [result, youRank])
+
+  if (!rewards) return null
 
   return (
-    <section className="flow-screen results-screen">
+    <section className="rs-screen">
       <img
-        className="flow-screen__art flow-screen__art--dim"
-        src={designArt.play}
+        className="rs-screen__art"
+        src={designArt.modes}
         alt=""
         draggable={false}
         aria-hidden
       />
-      <span className="flow-screen__scrim" aria-hidden />
+      <span className="rs-screen__scrim" aria-hidden />
 
-      <div className="flow-card results-screen__card">
-        <p className="results-screen__mode">{result.mode.toUpperCase()}</p>
-        <h2 className="display results-screen__title">{title}</h2>
+      <div className="rs-card">
+        <p className="rs-card__mode">{result.mode}</p>
+        <h2 className="rs-card__title">{headline}</h2>
 
-        <p className="results-screen__score">{result.score.toLocaleString()}</p>
-        {result.isPersonalBest ? (
-          <p className="results-screen__pb">Personal best — beat it again</p>
-        ) : (
-          <p className="results-screen__pb results-screen__pb--dim">
-            Best {personalBest.toLocaleString()}
-          </p>
-        )}
+        <p className="rs-card__score">{result.score.toLocaleString()}</p>
+        <p className={`rs-card__pb${result.isPersonalBest ? '' : ' is-dim'}`}>
+          {result.isPersonalBest ? 'Personal best' : `Best ${personalBest.toLocaleString()}`}
+        </p>
 
-        <dl className="results-screen__stats">
+        <div className="rs-card__stats">
           <div>
-            <dt>Top combo</dt>
-            <dd>x{result.comboHighwater}</dd>
+            <span>Combo</span>
+            <strong>x{result.comboHighwater}</strong>
           </div>
           <div>
-            <dt>Time</dt>
-            <dd>{result.durationSeconds}s</dd>
+            <span>Accuracy</span>
+            <strong>{result.accuracy}%</strong>
           </div>
           <div>
-            <dt>Juice earned</dt>
-            <dd>+{rewardCoins.toLocaleString()}</dd>
+            <span>Time</span>
+            <strong>{result.durationSeconds}s</strong>
           </div>
-        </dl>
+        </div>
 
-        <div className="results-screen__actions">
+        <div className="rs-card__loot">
+          <span>+{rewards.xpEarned} XP</span>
+          <span>+{rewards.coinsEarned} ★</span>
+        </div>
+
+        <ul className="rs-card__bonuses" aria-label="Bonuses">
+          {rewards.bonuses.map((b) => (
+            <li
+              key={b.id}
+              className={`rs-bonus${b.earned ? ' is-on' : ' is-off'}`}
+              title={b.earned ? `+${b.xp} XP · +${b.coins} ★` : 'Not earned'}
+            >
+              <span className="rs-bonus__icon" aria-hidden>
+                {BONUS_ICON[b.id]}
+              </span>
+              <span className="rs-bonus__name">{SHORT_LABEL[b.id]}</span>
+              <span className="rs-bonus__gain">
+                {b.earned ? `+${b.xp}` : '—'}
+              </span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="rs-card__actions">
           <button
             type="button"
             className="btn-primary"
@@ -83,7 +134,7 @@ export function ResultsScreen({
           >
             Play again
           </button>
-          {sliced && (
+          {result.score > 0 && (
             <button
               type="button"
               className="btn-secondary"
