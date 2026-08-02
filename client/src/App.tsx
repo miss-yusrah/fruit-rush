@@ -288,7 +288,7 @@ export default function App() {
         <ShopScreen
           onBuy={(name) => {
             if (!wallet.requireConnect()) {
-              showToast('Connect wallet to buy')
+              showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to buy')
               return
             }
             showToast(`Checkout stub · ${name}`)
@@ -301,10 +301,10 @@ export default function App() {
         <TournamentScreen
           onEnter={(id) => {
             if (!wallet.requireConnect()) {
-              showToast('Connect wallet to enter')
+              showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to enter')
               return
             }
-            showToast(`Entered ${id} · cUSD stub`)
+            showToast(`Entered ${id}`)
             setMode('Tournament')
             go('play')
           }}
@@ -318,14 +318,14 @@ export default function App() {
           minting={minting}
           onMint={() => {
             if (!wallet.requireConnect()) {
-              showToast('Connect wallet to mint')
+              showToast(wallet.inMiniPay ? 'Opening MiniPay…' : 'Link MiniPay to save your boast')
               return
             }
             setMinting(true)
             window.setTimeout(() => {
               setMintedId(Math.floor(1000 + Math.random() * 9000))
               setMinting(false)
-              showToast('Boast minted on Celo (demo)')
+              showToast('Boast saved (demo)')
             }, 900)
           }}
           onShare={async () => {

@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { Connector } from 'wagmi'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { isMiniPay } from '../wallet/minipay'
+import { useMiniPayAutoConnect } from '../wallet/useMiniPayAutoConnect'
 
 export type WalletStatus = 'disconnected' | 'connecting' | 'connected'
 
@@ -23,6 +25,8 @@ export interface WalletState {
   pendingWallet: string | null
   error: string | null
   menuOpen: boolean
+  /** True when opened inside MiniPay — connect is automatic, no picker. */
+  inMiniPay: boolean
   connect: (option: WalletOption) => void
   disconnect: () => void
   toggleMenu: () => void
@@ -35,12 +39,15 @@ function shorten(address: string): string {
   return `${address.slice(0, 6)}…${address.slice(-4)}`
 }
 
-/** Real Celo wallet via wagmi. Session restore is handled by wagmi itself. */
+/** Real account via wagmi. MiniPay auto-connects; browsers show a friendly picker. */
 export function useWallet(): WalletState {
+  useMiniPayAutoConnect()
+
   const account = useAccount()
   const { connectors, connectAsync, isPending, variables, error, reset } = useConnect()
   const { disconnect: wagmiDisconnect } = useDisconnect()
   const [menuOpen, setMenuOpen] = useState(false)
+  const inMiniPay = isMiniPay()
 
   const status: WalletStatus =
     account.status === 'connected'
@@ -50,6 +57,9 @@ export function useWallet(): WalletState {
         : 'disconnected'
 
   const options = useMemo<WalletOption[]>(() => {
+    // Inside MiniPay the account attaches automatically — no picker list.
+    if (inMiniPay) return []
+
     // Wallets discovered via EIP-6963 announce themselves individually;
     // hide the generic "injected" fallback when any were found.
     const discovered = connectors.filter((c) => c.type === 'injected' && c.id !== 'injected')
@@ -57,11 +67,11 @@ export function useWallet(): WalletState {
       .filter((c) => (c.id === 'injected' ? discovered.length === 0 : true))
       .map((c) => ({
         id: c.id,
-        name: c.id === 'injected' ? 'Browser wallet' : c.name,
+        name: c.id === 'injected' ? 'Browser account' : friendlyWalletName(c.name),
         icon: c.icon,
         connector: c,
       }))
-  }, [connectors])
+  }, [connectors, inMiniPay])
 
   const pendingWallet = useMemo(() => {
     if (!isPending) return null
@@ -107,6 +117,7 @@ export function useWallet(): WalletState {
     pendingWallet,
     error: error ? shortWalletError(error) : null,
     menuOpen,
+    inMiniPay,
     connect,
     disconnect,
     toggleMenu,
@@ -115,9 +126,18 @@ export function useWallet(): WalletState {
   }
 }
 
+function friendlyWalletName(name: string): string {
+  if (/minipay/i.test(name)) return 'MiniPay'
+  if (/metamask/i.test(name)) return 'MetaMask'
+  if (/valora/i.test(name)) return 'Valora'
+  return name
+}
+
 function shortWalletError(error: Error): string {
   const message = error.message ?? ''
-  if (/rejected|denied/i.test(message)) return 'Request rejected in wallet'
-  if (/provider not found|not detected/i.test(message)) return 'Wallet not found in this browser'
-  return message.split('\n')[0].slice(0, 120) || 'Connection failed'
+  if (/rejected|denied/i.test(message)) return 'Request cancelled'
+  if (/provider not found|not detected/i.test(message)) {
+    return 'Open Fruit Rush inside MiniPay, or install a phone wallet'
+  }
+  return message.split('\n')[0].slice(0, 120) || 'Couldn’t connect — try again'
 }

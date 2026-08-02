@@ -55,7 +55,7 @@ export function ModesScreen({ guest = false, onBack, onSelect }: ModesScreenProp
 
       {guest && (
         <div className="modes-guest-note" role="note">
-          Playing as guest — connect a wallet for tournaments, the shop and rewards
+          Playing as guest — link MiniPay for tournaments, the shop and rewards
         </div>
       )}
     </ArtScreen>
