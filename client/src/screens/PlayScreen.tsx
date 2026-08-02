@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { designArt } from '../assets/designs'
 import { FruitRushGame } from '../game/FruitRushGame'
 import type { GameEndPayload, GameHudState } from '../game/types'
-import { MODE_CONFIG } from '../game/types'
+import { MODE_CONFIG, formatTimeLeft } from '../game/types'
 import type { GameMode } from '../types/game'
 import '../styles/screens.css'
 
@@ -35,15 +35,41 @@ const INITIAL_HUD: GameHudState = {
   combo: 0,
   multiplier: 1,
   lives: 3,
-  timeLeft: 60,
+  timeLeft: 90,
   mode: 'Classic',
   status: 'countdown',
   countdown: 3,
 }
 
+function roundBlurb(mode: GameMode): { info: string; hint: string } {
+  const cfg = MODE_CONFIG[mode]
+  if (mode === 'Zen') {
+    return {
+      info: 'ZEN · endless practice',
+      hint: 'No bombs. No hazards. Slice forever.',
+    }
+  }
+  const mins = cfg.duration ? formatTimeLeft(cfg.duration) : '∞'
+  const threats = [
+    cfg.bombs ? 'bombs end the run' : null,
+    cfg.hazards ? 'spikes cost a life · ice steals points' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+  return {
+    info: `${mode.toUpperCase()} · ${mins} round`,
+    hint: `Swipe fruit to score · ${threats}`,
+  }
+}
+
 export function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
   const hostRef = useRef<HTMLDivElement>(null)
-  const [hud, setHud] = useState<GameHudState>({ ...INITIAL_HUD, mode })
+  const [hud, setHud] = useState<GameHudState>({
+    ...INITIAL_HUD,
+    mode,
+    timeLeft: MODE_CONFIG[mode].duration,
+    lives: Math.min(MODE_CONFIG[mode].lives, 3),
+  })
   const portrait = usePortrait()
 
   useEffect(() => {
@@ -69,12 +95,9 @@ export function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
     }
   }, [mode, onEnded])
 
-  const timerLabel =
-    hud.timeLeft === null ? '∞' : `${Math.ceil(hud.timeLeft)}`.padStart(2, '0')
-  const timerUrgent = hud.timeLeft !== null && hud.timeLeft <= 10
-  const roundInfo = MODE_CONFIG[mode].duration
-    ? `${mode} · ${MODE_CONFIG[mode].duration} second round`
-    : `${mode} · endless, no timer`
+  const timerLabel = formatTimeLeft(hud.timeLeft)
+  const timerUrgent = hud.timeLeft !== null && hud.timeLeft <= 15
+  const blurb = roundBlurb(mode)
 
   return (
     <section className={`art-screen play-screen${portrait ? ' play-screen--rotated' : ''}`}>
@@ -89,23 +112,31 @@ export function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
 
       <div className="play-hud">
         <div className="play-hud__top">
-          <strong className="play-hud__score">{hud.score.toLocaleString()}</strong>
+          <div className="play-hud__score-wrap">
+            <span className="play-hud__label">Score</span>
+            <strong className="play-hud__score">{hud.score.toLocaleString()}</strong>
+          </div>
+
           <div className="play-hud__center">
-            <span
-              className={`play-hud__timer${timerUrgent ? ' is-urgent' : ''}`}
-              aria-label="time left"
-            >
-              {timerLabel}
-            </span>
+            <div className={`play-hud__timer-wrap${timerUrgent ? ' is-urgent' : ''}`}>
+              <span className="play-hud__label">Time</span>
+              <span className="play-hud__timer" aria-label="time left">
+                {timerLabel}
+              </span>
+            </div>
             <span className="play-hud__mode">{hud.mode.toUpperCase()}</span>
             <span className="play-hud__combo">
               {hud.combo >= 3 ? `x${hud.multiplier} COMBO` : ''}
             </span>
           </div>
-          <div className="play-hud__lives" aria-label={`${hud.lives} lives`}>
-            {[0, 1, 2].map((i) => (
-              <span key={i} className={`life${i < hud.lives ? ' is-on' : ''}`} />
-            ))}
+
+          <div className="play-hud__lives-wrap">
+            <span className="play-hud__label">Lives</span>
+            <div className="play-hud__lives" aria-label={`${hud.lives} lives`}>
+              {[0, 1, 2].map((i) => (
+                <span key={i} className={`life${i < hud.lives ? ' is-on' : ''}`} />
+              ))}
+            </div>
           </div>
         </div>
 
@@ -122,10 +153,8 @@ export function PlayScreen({ mode, onExit, onEnded }: PlayScreenProps) {
           <span className="display">
             {hud.countdown > 0.3 ? Math.ceil(hud.countdown) : 'SLASH'}
           </span>
-          <span className="play-countdown__info">{roundInfo}</span>
-          <span className="play-countdown__hint">
-            Swipe through fruit to score · slicing a bomb ends the run
-          </span>
+          <span className="play-countdown__info">{blurb.info}</span>
+          <span className="play-countdown__hint">{blurb.hint}</span>
         </div>
       )}
     </section>

@@ -373,7 +373,33 @@ img {
   touch-action: none;
 }
 
-/* ── Modes: guest notice ─────────────────────────────────── */
+/* ── Modes: guest notice + live rules strip ──────────────── */
+
+.modes-rules {
+  position: absolute;
+  left: 50%;
+  bottom: 11%;
+  transform: translateX(-50%);
+  width: 88%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.modes-rules span {
+  display: block;
+  padding: 0.32rem 0.7rem;
+  border-radius: 8px;
+  background: rgba(8, 20, 14, 0.78);
+  border: 1px solid rgba(244, 237, 224, 0.22);
+  color: var(--cream);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
 
 .modes-guest-note {
   position: absolute;
@@ -391,6 +417,7 @@ img {
   font-weight: 600;
   text-align: center;
   pointer-events: none;
+  z-index: 3;
 }
 
 .play-hud {
@@ -412,34 +439,74 @@ img {
 }
 
 .play-hud__score {
-  font-size: clamp(1.6rem, 7cqw, 2.4rem);
+  font-size: clamp(1.8rem, 8vmin, 2.8rem);
   font-weight: 800;
   font-style: italic;
   letter-spacing: -0.03em;
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+  line-height: 1;
+}
+
+.play-hud__score-wrap,
+.play-hud__lives-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.play-hud__lives-wrap {
+  align-items: flex-end;
+}
+
+.play-hud__label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cream);
+  opacity: 0.75;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
 }
 
 .play-hud__center {
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 2px;
+}
+
+.play-hud__timer-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 1px;
+  min-width: 5.5rem;
+  padding: 0.35rem 0.9rem 0.45rem;
+  border-radius: 14px;
+  border: 1px solid rgba(244, 237, 224, 0.35);
+  background: rgba(5, 14, 10, 0.72);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+.play-hud__timer-wrap.is-urgent {
+  border-color: rgba(255, 90, 60, 0.7);
+  background: rgba(60, 12, 8, 0.78);
+  animation: timer-pulse 0.5s ease-in-out infinite alternate;
 }
 
 .play-hud__timer {
-  font-size: clamp(2rem, 9cqw, 3rem);
+  font-size: clamp(2.4rem, 11vmin, 3.6rem);
   font-weight: 800;
   font-style: italic;
   line-height: 1;
   letter-spacing: -0.02em;
-  color: var(--cream);
+  color: var(--lime);
   font-variant-numeric: tabular-nums;
   text-shadow: 0 3px 10px rgba(0, 0, 0, 0.6);
 }
 
-.play-hud__timer.is-urgent {
+.play-hud__timer-wrap.is-urgent .play-hud__timer {
   color: #ff5a3c;
-  animation: timer-pulse 0.5s ease-in-out infinite alternate;
 }
 
 @keyframes timer-pulse {
@@ -447,17 +514,17 @@ img {
     transform: scale(1);
   }
   to {
-    transform: scale(1.14);
+    transform: scale(1.06);
   }
 }
 
 .play-hud__mode {
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--cream);
-  opacity: 0.8;
+  opacity: 0.85;
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
 }
 
@@ -466,7 +533,7 @@ img {
   color: var(--lime);
   font-weight: 800;
   font-style: italic;
-  font-size: clamp(1rem, 4.5cqw, 1.35rem);
+  font-size: clamp(1rem, 4.5vmin, 1.35rem);
   text-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
   min-height: 1.2em;
 }

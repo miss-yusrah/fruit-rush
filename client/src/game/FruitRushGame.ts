@@ -40,7 +40,8 @@ import passionfruitUrl from '../assets/fruits/passionfruit.png'
 import passionfruitHalfUrl from '../assets/fruits/passionfruit-half.png'
 import bombUrl from '../assets/fruits/bomb.png'
 
-type EdibleKind = Exclude<FruitKind, 'bomb'>
+type EdibleKind = Exclude<FruitKind, 'bomb' | 'spike' | 'ice'>
+type HazardKind = 'bomb' | 'spike' | 'ice'
 
 interface FruitSpec {
   whole: string
@@ -67,7 +68,9 @@ const FRUIT_SPECS: Record<EdibleKind, FruitSpec> = {
 
 const EDIBLE_KINDS = Object.keys(FRUIT_SPECS) as EdibleKind[]
 const TOTAL_WEIGHT = EDIBLE_KINDS.reduce((s, k) => s + FRUIT_SPECS[k].weight, 0)
-const BOMB_RADIUS = 38
+const BOMB_RADIUS = 40
+const SPIKE_RADIUS = 36
+const ICE_RADIUS = 38
 const GRAVITY = 1150
 const TRAIL_LIFE_MS = 170
 const PRAISE: Array<{ streak: number; word: string; tint: number }> = [
@@ -76,6 +79,10 @@ const PRAISE: Array<{ streak: number; word: string; tint: number }> = [
   { streak: 3, word: 'Great!', tint: 0x9be564 },
 ]
 
+function isHazard(kind: FruitKind): kind is HazardKind {
+  return kind === 'bomb' || kind === 'spike' || kind === 'ice'
+}
+
 interface FruitTextures {
   whole: Texture
   halfL: Texture
@@ -83,7 +90,7 @@ interface FruitTextures {
 }
 
 interface FruitEntity {
-  view: Sprite
+  view: Container
   kind: FruitKind
   radius: number
   x: number
@@ -137,7 +144,7 @@ interface TrailPoint {
 
 interface PendingSpawn {
   delay: number
-  bomb: boolean
+  kind: 'fruit' | HazardKind
 }
 
 interface FruitRushGameOptions {
@@ -183,6 +190,8 @@ export class FruitRushGame {
   private inFrenzy = false
   /** Fruits launched since the last bomb — drives the guaranteed cadence. */
   private sinceBomb = 0
+  /** Launches since the last non-bomb hazard (spike / ice). */
+  private sinceHazard = 0
   private freeze = 0
   private shake = 0
   private flash = 0
@@ -385,7 +394,7 @@ export class FruitRushGame {
     for (const spawn of this.pendingSpawns) spawn.delay -= dt
     while (this.pendingSpawns.length && this.pendingSpawns[0].delay <= 0) {
       const spawn = this.pendingSpawns.shift()!
-      this.launchFruit(spawn.bomb)
+      this.launchFruit(spawn.kind)
     }
 
     this.waveTimer -= dt
@@ -396,11 +405,10 @@ export class FruitRushGame {
     const baseSize = 1 + Math.random() * (0.8 + ramp * 3.2)
     const size = Math.min(5, Math.round(baseSize) + (this.inFrenzy ? 2 : 0))
 
-    const bombChance = this.config.bombs ? (this.inFrenzy ? 0.16 : 0.11) : 0
     for (let i = 0; i < size; i++) {
       this.pendingSpawns.push({
         delay: i * (0.09 + Math.random() * 0.12),
-        bomb: Math.random() < bombChance,
+        kind: this.pickSpawnKind(),
       })
     }
 
@@ -409,6 +417,34 @@ export class FruitRushGame {
     const max = this.config.spawnMaxMs * gapScale
     // Wave gap: base gap plus room for the wave itself to play out.
     this.waveTimer = (min + Math.random() * (max - min)) / 1000 + size * 0.22
+  }
+
+  /** Decide fruit vs bomb vs spike/ice for the next launch. */
+  private pickSpawnKind(): PendingSpawn['kind'] {
+    // Zen is pure practice — never throw hazards.
+    if (!this.config.bombs && !this.config.hazards) return 'fruit'
+
+    // Guaranteed bomb cadence so Classic always feels the threat.
+    if (this.config.bombs && this.elapsed > 4 && this.sinceBomb >= 5) {
+      return 'bomb'
+    }
+
+    // Guaranteed spike/ice between bombs.
+    if (this.config.hazards && this.elapsed > 3 && this.sinceHazard >= 4) {
+      return Math.random() < 0.55 ? 'spike' : 'ice'
+    }
+
+    if (this.config.bombs) {
+      const bombChance = this.inFrenzy ? 0.22 : 0.16
+      if (Math.random() < bombChance) return 'bomb'
+    }
+
+    if (this.config.hazards) {
+      const hazardChance = this.inFrenzy ? 0.18 : 0.12
+      if (Math.random() < hazardChance) return Math.random() < 0.55 ? 'spike' : 'ice'
+    }
+
+    return 'fruit'
   }
 
   private pickKind(): EdibleKind {
@@ -420,27 +456,44 @@ export class FruitRushGame {
     return 'watermelon'
   }
 
-  private launchFruit(bomb: boolean) {
+  private launchFruit(spawnKind: PendingSpawn['kind']) {
     if (!this.app) return
     const w = this.app.screen.width
     const h = this.app.screen.height
 
-    // Guarantee a bomb shows up at a steady cadence even if the random
-    // rolls run cold — every round with bombs should feel their threat.
-    let isBomb = bomb && this.config.bombs
-    if (!isBomb && this.config.bombs && this.elapsed > 5 && this.sinceBomb >= 9) {
-      isBomb = true
+    let kind: FruitKind
+    if (spawnKind === 'bomb' && this.config.bombs) kind = 'bomb'
+    else if (spawnKind === 'spike' && this.config.hazards) kind = 'spike'
+    else if (spawnKind === 'ice' && this.config.hazards) kind = 'ice'
+    else kind = this.pickKind()
+
+    if (kind === 'bomb') {
+      this.sinceBomb = 0
+      this.sinceHazard += 1
+    } else if (kind === 'spike' || kind === 'ice') {
+      this.sinceHazard = 0
+      this.sinceBomb += 1
+    } else {
+      this.sinceBomb += 1
+      this.sinceHazard += 1
     }
-    this.sinceBomb = isBomb ? 0 : this.sinceBomb + 1
 
-    const kind: FruitKind = isBomb ? 'bomb' : this.pickKind()
-    const radius = kind === 'bomb' ? BOMB_RADIUS : FRUIT_SPECS[kind].radius
-    const tex = this.textures.get(kind)!
+    const radius =
+      kind === 'bomb' ? BOMB_RADIUS : kind === 'spike' ? SPIKE_RADIUS : kind === 'ice' ? ICE_RADIUS : FRUIT_SPECS[kind].radius
 
-    const sprite = new Sprite(tex.whole)
-    sprite.anchor.set(0.5)
-    const scale = (radius * 2) / Math.max(sprite.texture.width, sprite.texture.height)
-    sprite.scale.set(scale)
+    let view: Container
+    if (kind === 'spike') {
+      view = this.makeSpikeView(radius)
+    } else if (kind === 'ice') {
+      view = this.makeIceView(radius)
+    } else {
+      const tex = this.textures.get(kind)!
+      const sprite = new Sprite(tex.whole)
+      sprite.anchor.set(0.5)
+      const scale = (radius * 2) / Math.max(sprite.texture.width, sprite.texture.height)
+      sprite.scale.set(scale)
+      view = sprite
+    }
 
     const x = w * (0.1 + Math.random() * 0.8)
     const y = h + radius + 10
@@ -457,12 +510,12 @@ export class FruitRushGame {
     if (landX < w * 0.06) vx = (w * 0.06 - x) / flightTime
     if (landX > w * 0.94) vx = (w * 0.94 - x) / flightTime
 
-    sprite.x = x
-    sprite.y = y
-    this.fruitLayer.addChild(sprite)
+    view.x = x
+    view.y = y
+    this.fruitLayer.addChild(view)
 
     this.fruits.push({
-      view: sprite,
+      view,
       kind,
       radius,
       x,
@@ -472,6 +525,42 @@ export class FruitRushGame {
       spin: (Math.random() < 0.5 ? -1 : 1) * (1.2 + Math.random() * 2.8),
       alive: true,
     })
+  }
+
+  private makeSpikeView(radius: number): Container {
+    const g = new Graphics()
+    const spikes = 8
+    g.moveTo(radius, 0)
+    for (let i = 0; i <= spikes; i++) {
+      const a = (i / spikes) * Math.PI * 2
+      const r = i % 2 === 0 ? radius : radius * 0.55
+      g.lineTo(Math.cos(a) * r, Math.sin(a) * r)
+    }
+    g.fill({ color: 0x2a1a14 })
+    g.circle(0, 0, radius * 0.42)
+    g.fill({ color: 0x5a2a1a })
+    g.circle(-radius * 0.12, -radius * 0.12, radius * 0.12)
+    g.fill({ color: 0x8a4a2a })
+    return g
+  }
+
+  private makeIceView(radius: number): Container {
+    const g = new Graphics()
+    const hex = (r: number, rot = 0) => {
+      const pts: number[] = []
+      for (let i = 0; i < 6; i++) {
+        const a = rot + (i / 6) * Math.PI * 2
+        pts.push(Math.cos(a) * r, Math.sin(a) * r)
+      }
+      return pts
+    }
+    g.poly(hex(radius))
+    g.fill({ color: 0x7ec8ff })
+    g.poly(hex(radius * 0.62, Math.PI / 6))
+    g.fill({ color: 0xd8f0ff })
+    g.circle(-radius * 0.18, -radius * 0.2, radius * 0.14)
+    g.fill({ color: 0xffffff, alpha: 0.85 })
+    return g
   }
 
   // ------------------------------------------------------------- physics
@@ -492,10 +581,11 @@ export class FruitRushGame {
       if (fruit.vy > 0 && fruit.y - fruit.radius > h + 60) {
         fruit.alive = false
         fruit.view.destroy()
+        // Hazards falling away are free — only missing edible fruit costs a life.
         if (
-          fruit.kind !== 'bomb' &&
+          !isHazard(fruit.kind) &&
           this.mode !== 'Zen' &&
-          this.elapsed > 1.25 &&
+          this.elapsed > 3.5 &&
           this.endDelay < 0
         ) {
           this.lives -= 1
@@ -661,6 +751,16 @@ export class FruitRushGame {
         return
       }
 
+      if (fruit.kind === 'spike') {
+        this.hitSpike(fruit)
+        continue
+      }
+
+      if (fruit.kind === 'ice') {
+        this.hitIce(fruit)
+        continue
+      }
+
       const spec = FRUIT_SPECS[fruit.kind as EdibleKind]
       this.spawnHalves(fruit, angle)
       this.spawnJuice(fruit.x, fruit.y, spec, angle)
@@ -717,6 +817,51 @@ export class FruitRushGame {
       )
     }
     this.spawnText('BOOM', fruit.x, fruit.y - 30, 0xff5252, 46)
+  }
+
+  /** Spike mine: lose a life, break combo — run continues unless lives hit 0. */
+  private hitSpike(fruit: FruitEntity) {
+    this.shake = Math.max(this.shake, 10)
+    this.freeze = 0.08
+    this.combo = 0
+    this.lives -= 1
+    for (let i = 0; i < 14; i++) {
+      const angle = Math.random() * Math.PI * 2
+      const speed = 120 + Math.random() * 280
+      this.pushParticle(
+        fruit.x,
+        fruit.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed - 40,
+        0x5a2a1a,
+        2 + Math.random() * 4,
+        0.4 + Math.random() * 0.35,
+      )
+    }
+    this.spawnText('SPIKE −1', fruit.x, fruit.y - 28, 0xff6b1a, 32)
+    if (this.lives <= 0) this.endDelay = 0.7
+  }
+
+  /** Ice orb: break combo and deduct points — does not end the run. */
+  private hitIce(fruit: FruitEntity) {
+    this.shake = Math.max(this.shake, 6)
+    this.freeze = 0.05
+    this.combo = 0
+    this.score = Math.max(0, this.score - 40)
+    for (let i = 0; i < 18; i++) {
+      const angle = Math.random() * Math.PI * 2
+      const speed = 90 + Math.random() * 240
+      this.pushParticle(
+        fruit.x,
+        fruit.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed - 30,
+        Math.random() < 0.5 ? 0x7ec8ff : 0xffffff,
+        2 + Math.random() * 3.5,
+        0.45 + Math.random() * 0.35,
+      )
+    }
+    this.spawnText('ICE −40', fruit.x, fruit.y - 28, 0x7ec8ff, 30)
   }
 
   private spawnHalves(fruit: FruitEntity, sliceAngle: number) {
