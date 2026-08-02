@@ -236,6 +236,7 @@ export default function App() {
           guest={guest && wallet.status !== 'connected'}
           onBack={() => go('home')}
           onSelect={(selected) => {
+            // Set mode first, then enter play in the same tick (batched).
             setMode(selected)
             go('play')
           }}
@@ -243,7 +244,12 @@ export default function App() {
       )}
 
       {screen === 'play' && (
-        <PlayScreen mode={mode} onExit={() => go('modes')} onEnded={handleGameEnd} />
+        <PlayScreen
+          key={mode}
+          mode={mode}
+          onExit={() => go('modes')}
+          onEnded={handleGameEnd}
+        />
       )}
 
       {screen === 'results' && lastResult && (

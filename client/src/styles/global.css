@@ -392,33 +392,7 @@ img {
   touch-action: none;
 }
 
-/* ── Modes: guest notice + live rules strip ──────────────── */
-
-.modes-rules {
-  position: absolute;
-  left: 50%;
-  bottom: 11%;
-  transform: translateX(-50%);
-  width: 88%;
-  display: flex;
-  flex-direction: column;
-  gap: 0.28rem;
-  pointer-events: none;
-  z-index: 3;
-}
-
-.modes-rules span {
-  display: block;
-  padding: 0.32rem 0.7rem;
-  border-radius: 8px;
-  background: rgba(8, 20, 14, 0.78);
-  border: 1px solid rgba(244, 237, 224, 0.22);
-  color: var(--cream);
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-align: center;
-}
+/* ── Modes: guest notice ─────────────────────────────────── */
 
 .modes-guest-note {
   position: absolute;
