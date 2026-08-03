@@ -620,8 +620,9 @@ export class FruitRushGame {
     const x = w * (0.1 + Math.random() * 0.8)
     const y = h + radius + 10
 
-    // Explosive launch: 60-120 degrees, apex between 45% and 82% of the screen.
-    const apex = h * (0.45 + Math.random() * 0.37)
+    // Explosive launch: 60-120 degrees. Apex matches the pre-shrink peak height
+    // (smaller fruit spawn ~30px lower, so bump the toss by the same amount).
+    const apex = h * (0.45 + Math.random() * 0.37) + 30
     const vyMag = Math.sqrt(2 * GRAVITY * apex)
     const angleDeg = 60 + Math.random() * 60
     let vx = vyMag / Math.tan((angleDeg * Math.PI) / 180)

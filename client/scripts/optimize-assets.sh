@@ -27,7 +27,13 @@ if [[ -d "$FRUITS/_png_source" ]]; then
     convert "$f" -strip -resize "${CELL}x${CELL}" -background none \
       -gravity center -extent "${CELL}x${CELL}" "$TMP/${base}.png"
   done
-  montage "$TMP"/*.png -tile "${COLS}x${ROWS}" -geometry "${CELL}x${CELL}+0+0" \
+  # Montage MUST use the same basename order as sheet.json (Python sorted).
+  # Bare shell globs put "apple-half" before "apple", which swaps whole/half frames.
+  ORDERED=()
+  while IFS= read -r base; do
+    ORDERED+=("$TMP/${base}.png")
+  done < <(python3 -c "import glob,os; print('\n'.join(sorted(os.path.basename(p)[:-4] for p in glob.glob('$TMP/*.png'))))")
+  montage "${ORDERED[@]}" -tile "${COLS}x${ROWS}" -geometry "${CELL}x${CELL}+0+0" \
     -background none -gravity northwest "$TMP/sheet.png"
   convert "$TMP/sheet.png" -background none -extent "$((COLS * CELL))x$((ROWS * CELL))" \
     -strip -quality 85 "$FRUITS/sheet.webp"

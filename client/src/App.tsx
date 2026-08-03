@@ -225,14 +225,30 @@ export default function App() {
       screen === 'onboarding' ||
       screen === 'splash'
     ) {
-      if (audio.currentTheme !== 'menu') audio.enterMenu()
+      void audio.unlock().then(() => {
+        audio.kick()
+        if (audio.currentTheme !== 'menu') audio.enterMenu()
+      })
       return
     }
     // Shop & tournaments get the hotter alternate dance groove.
     if (screen === 'shop' || screen === 'tournaments') {
-      if (audio.currentTheme !== 'hype') audio.enterHype(600)
+      void audio.unlock().then(() => {
+        audio.kick()
+        if (audio.currentTheme !== 'hype') audio.enterHype(600)
+      })
     }
   }, [screen])
+
+  // Wallet/email overlays steal focus — resume Web Audio when the window returns.
+  useEffect(() => {
+    const onFocus = () => {
+      if (!audio.isMusicEnabled) return
+      void audio.revive()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [])
 
   // Esc closes the settings popup.
   useEffect(() => {
