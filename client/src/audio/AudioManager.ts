@@ -227,6 +227,8 @@ export class AudioManager {
     } catch {
       /* gesture may be required */
     }
+    // OTP / wallet iframes leave theme timers zombie after a long suspend.
+    this.restartActiveThemeScheduler()
   }
 
   private resumeIfNeeded() {
@@ -241,6 +243,8 @@ export class AudioManager {
   async unlock() {
     this.bootstrap()
     if (!this.ctx) return
+    // User gesture — clear visibility lock so Magic/wallet iframes can't strand us.
+    this.suspendedByVisibility = false
     if (this.ctx.state === 'suspended') {
       try {
         // Some browsers never settle resume() until a gesture — don't hang callers.
@@ -260,8 +264,31 @@ export class AudioManager {
   kick() {
     this.bootstrap()
     if (!this.ctx) return
+    // Pointer = gesture; don't stay muted after Magic OTP / extension popups.
+    this.suspendedByVisibility = false
     this.resumeIfNeeded()
     if (this.ctx.state === 'running') this.unlocked = true
+  }
+
+  /**
+   * After Magic OTP / wallet extension flows the AudioContext often resumes
+   * muted with a dead theme scheduler. Call on auth success (user gesture).
+   */
+  async revive() {
+    await this.unlock()
+    this.kick()
+    if (!this.ctx || !this.musicEnabled) return
+    if (this.theme === 'none') {
+      this.enterMenu()
+      return
+    }
+    this.restartActiveThemeScheduler()
+  }
+
+  private restartActiveThemeScheduler() {
+    if (this.theme === 'none') return
+    this.clearThemeTimer(this.theme)
+    this.ensureThemeScheduler(this.theme)
   }
 
   // ── Settings ──────────────────────────────────────────────

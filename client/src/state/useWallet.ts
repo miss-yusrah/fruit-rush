@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { Connector } from 'wagmi'
 import { useAccount, useConnect, useDisconnect } from 'wagmi'
+import { audio } from '../audio'
 import {
   isMagicConfigured,
   loginWithEmail as magicLoginWithEmail,
@@ -160,9 +161,13 @@ export function useWalletImpl(): WalletState {
           clearMagicLocal()
         })
       }
-      connectAsync({ connector: option.connector }).catch(() => {
-        // Rejection/failure surfaces through `error`; keep the picker open.
-      })
+      connectAsync({ connector: option.connector })
+        .then(() => {
+          void audio.revive()
+        })
+        .catch(() => {
+          // Rejection/failure surfaces through `error`; keep the picker open.
+        })
     },
     [clearMagicLocal, connectAsync, isPending, magicAddress, magicBusy],
   )
@@ -178,11 +183,15 @@ export function useWalletImpl(): WalletState {
         setMagicAddress(session.address)
         setMagicEmail(session.email ?? email.trim())
         setMenuOpen(false)
+        // Magic OTP iframe suspends Web Audio — kick the menu groove back on.
+        void audio.revive()
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Email sign-in failed'
         if (!/cancel|closed/i.test(message)) {
           setMagicError(shortMagicError(message))
         }
+        // Cancelled OTP still stole focus — restore music if we can.
+        void audio.revive()
         throw err
       } finally {
         setMagicBusy(false)
