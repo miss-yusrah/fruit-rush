@@ -18,6 +18,12 @@ function leanColor(r: number, g: number, b: number, dr: number, dg: number, db: 
 }
 
 export function createWoodTexture(width = BASE_W, height = BASE_H): Texture {
+  // Phones don't need a 1280×720 procedural board — half res is plenty at DPR≤1.5.
+  const coarse = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches
+  if (coarse) {
+    width = Math.round(width * 0.5)
+    height = Math.round(height * 0.5)
+  }
   const canvas = document.createElement('canvas')
   canvas.width = width
   canvas.height = height

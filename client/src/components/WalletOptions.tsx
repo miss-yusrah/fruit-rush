@@ -4,7 +4,10 @@ interface WalletOptionsProps {
   wallet: WalletState
 }
 
-/** Account picker for browsers outside MiniPay. MiniPay never shows this list. */
+/**
+ * Account picker for browsers outside MiniPay.
+ * MiniPay never appears here — it only injects inside the MiniPay app and auto-connects.
+ */
 export function WalletOptions({ wallet }: WalletOptionsProps) {
   const { options, connect, status, pendingWallet, error, inMiniPay } = wallet
 
@@ -13,8 +16,8 @@ export function WalletOptions({ wallet }: WalletOptionsProps) {
   if (options.length === 0) {
     return (
       <p className="wallet-options__empty">
-        Nothing to link here. Open Fruit Rush inside <strong>MiniPay</strong> for the smoothest
-        play — or refresh after installing a supported app.
+        No browser wallet found. For the smoothest Celo play, open Fruit Rush inside{' '}
+        <strong>MiniPay</strong> — it connects automatically. Or install MetaMask / Valora.
       </p>
     )
   }
@@ -43,7 +46,7 @@ export function WalletOptions({ wallet }: WalletOptionsProps) {
         </button>
       ))}
 
-      {status === 'connecting' && (
+      {status === 'connecting' && pendingWallet && pendingWallet !== 'Email' && (
         <p className="wallet-options__status">Approve in {pendingWallet}…</p>
       )}
       {error && status !== 'connecting' && (

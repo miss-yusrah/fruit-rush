@@ -1,6 +1,5 @@
 import {
   Application,
-  Assets,
   Container,
   Graphics,
   Rectangle,
@@ -9,6 +8,7 @@ import {
   TextStyle,
   Texture,
 } from 'pixi.js'
+import { getFruitTexture, preloadGameAssets } from '../assets/preload'
 import { audio } from '../audio'
 import type { GameMode } from '../types/game'
 import {
@@ -18,35 +18,15 @@ import {
   type GameEndPayload,
   type GameHudState,
 } from './types'
+import { pickSpawnKind } from './spawnRules'
 import { createWoodTexture } from './woodBackground'
 import { createJuiceStainTexture } from './juiceStain'
-
-import watermelonUrl from '../assets/fruits/watermelon.png'
-import watermelonHalfUrl from '../assets/fruits/watermelon-half.png'
-import orangeUrl from '../assets/fruits/orange.png'
-import orangeHalfUrl from '../assets/fruits/orange-half.png'
-import appleUrl from '../assets/fruits/apple.png'
-import appleHalfUrl from '../assets/fruits/apple-half.png'
-import coconutUrl from '../assets/fruits/coconut.png'
-import coconutHalfUrl from '../assets/fruits/coconut-half.png'
-import pearUrl from '../assets/fruits/pear.png'
-import pearHalfUrl from '../assets/fruits/pear-half.png'
-import pineappleUrl from '../assets/fruits/pineapple.png'
-import pineappleHalfUrl from '../assets/fruits/pineapple-half.png'
-import mangoUrl from '../assets/fruits/mango.png'
-import mangoHalfUrl from '../assets/fruits/mango-half.png'
-import kiwiUrl from '../assets/fruits/kiwi.png'
-import kiwiHalfUrl from '../assets/fruits/kiwi-half.png'
-import lemonUrl from '../assets/fruits/lemon.png'
-import lemonHalfUrl from '../assets/fruits/lemon-half.png'
-import passionfruitUrl from '../assets/fruits/passionfruit.png'
-import passionfruitHalfUrl from '../assets/fruits/passionfruit-half.png'
-import bombUrl from '../assets/fruits/bomb.png'
 
 type EdibleKind = Exclude<FruitKind, 'bomb' | 'spike' | 'ice'>
 type HazardKind = 'bomb' | 'spike' | 'ice'
 
 interface FruitSpec {
+  /** Frame name inside fruits/sheet.webp */
   whole: string
   half: string
   radius: number
@@ -56,18 +36,21 @@ interface FruitSpec {
   weight: number
 }
 
-/** Arcade juice / stain colors — vivid enough to read on dark wood. */
+/**
+ * On-screen radii (px). Fruit Ninja-class scale: diameter ≈ 10–14% of the
+ * short play axis (~42–60px on a phone stage). Old values were ~40–62.
+ */
 const FRUIT_SPECS: Record<EdibleKind, FruitSpec> = {
-  watermelon: { whole: watermelonUrl, half: watermelonHalfUrl, radius: 62, points: 15, juice: 0xc62828, seeds: 5, weight: 10 },
-  orange: { whole: orangeUrl, half: orangeHalfUrl, radius: 48, points: 10, juice: 0xff8c1a, seeds: 0, weight: 12 },
-  apple: { whole: appleUrl, half: appleHalfUrl, radius: 48, points: 10, juice: 0xff6b6b, seeds: 2, weight: 12 },
-  coconut: { whole: coconutUrl, half: coconutHalfUrl, radius: 52, points: 14, juice: 0xf5f0e6, seeds: 0, weight: 7 },
-  pear: { whole: pearUrl, half: pearHalfUrl, radius: 50, points: 10, juice: 0xe8e090, seeds: 2, weight: 10 },
-  pineapple: { whole: pineappleUrl, half: pineappleHalfUrl, radius: 58, points: 14, juice: 0xffd54a, seeds: 0, weight: 8 },
-  mango: { whole: mangoUrl, half: mangoHalfUrl, radius: 50, points: 12, juice: 0xffb300, seeds: 0, weight: 10 },
-  kiwi: { whole: kiwiUrl, half: kiwiHalfUrl, radius: 42, points: 12, juice: 0x7cb342, seeds: 4, weight: 9 },
-  lemon: { whole: lemonUrl, half: lemonHalfUrl, radius: 42, points: 10, juice: 0xffe566, seeds: 2, weight: 10 },
-  passionfruit: { whole: passionfruitUrl, half: passionfruitHalfUrl, radius: 40, points: 16, juice: 0xf0a020, seeds: 6, weight: 5 },
+  watermelon: { whole: 'watermelon', half: 'watermelon-half', radius: 32, points: 15, juice: 0xc62828, seeds: 5, weight: 10 },
+  orange: { whole: 'orange', half: 'orange-half', radius: 26, points: 10, juice: 0xff8c1a, seeds: 0, weight: 12 },
+  apple: { whole: 'apple', half: 'apple-half', radius: 26, points: 10, juice: 0xff6b6b, seeds: 2, weight: 12 },
+  coconut: { whole: 'coconut', half: 'coconut-half', radius: 28, points: 14, juice: 0xf5f0e6, seeds: 0, weight: 7 },
+  pear: { whole: 'pear', half: 'pear-half', radius: 27, points: 10, juice: 0xe8e090, seeds: 2, weight: 10 },
+  pineapple: { whole: 'pineapple', half: 'pineapple-half', radius: 30, points: 14, juice: 0xffd54a, seeds: 0, weight: 8 },
+  mango: { whole: 'mango', half: 'mango-half', radius: 27, points: 12, juice: 0xffb300, seeds: 0, weight: 10 },
+  kiwi: { whole: 'kiwi', half: 'kiwi-half', radius: 22, points: 12, juice: 0x7cb342, seeds: 4, weight: 9 },
+  lemon: { whole: 'lemon', half: 'lemon-half', radius: 22, points: 10, juice: 0xffe566, seeds: 2, weight: 10 },
+  passionfruit: { whole: 'passionfruit', half: 'passionfruit-half', radius: 20, points: 16, juice: 0xf0a020, seeds: 6, weight: 5 },
 }
 
 /** Cap persistent board stains so long sessions stay smooth. */
@@ -75,9 +58,9 @@ const MAX_STAINS = 52
 
 const EDIBLE_KINDS = Object.keys(FRUIT_SPECS) as EdibleKind[]
 const TOTAL_WEIGHT = EDIBLE_KINDS.reduce((s, k) => s + FRUIT_SPECS[k].weight, 0)
-const BOMB_RADIUS = 40
-const SPIKE_RADIUS = 36
-const ICE_RADIUS = 38
+const BOMB_RADIUS = 24
+const SPIKE_RADIUS = 22
+const ICE_RADIUS = 22
 const GRAVITY = 1150
 const TRAIL_LIFE_MS = 170
 const PRAISE: Array<{ streak: number; word: string; tint: number }> = [
@@ -220,6 +203,9 @@ export class FruitRushGame {
   private burstCount = 0
   private burstTimer = 0
   private destroyed = false
+  private paused = false
+  /** Status before pause (countdown vs playing) so resume is correct. */
+  private statusBeforePause: 'countdown' | 'playing' = 'playing'
   private sessionStart = 0
   private fruitsSliced = 0
   private fruitsMissed = 0
@@ -243,6 +229,28 @@ export class FruitRushGame {
     this.timeLeft = this.config.duration
     this.onHud = opts.onHud
     this.onEnd = opts.onEnd
+  }
+
+  get isPaused() {
+    return this.paused
+  }
+
+  pause() {
+    if (this.destroyed || this.paused) return
+    if (this.status !== 'playing' && this.status !== 'countdown') return
+    this.statusBeforePause = this.status
+    this.paused = true
+    this.slicing = false
+    this.trail = []
+    this.status = 'paused'
+    this.emitHud()
+  }
+
+  resume() {
+    if (this.destroyed || !this.paused) return
+    this.paused = false
+    this.status = this.statusBeforePause
+    this.emitHud()
   }
 
   async start() {
@@ -317,27 +325,32 @@ export class FruitRushGame {
   }
 
   private async loadTextures() {
-    const urls: string[] = [bombUrl]
-    for (const kind of EDIBLE_KINDS) {
-      urls.push(FRUIT_SPECS[kind].whole, FRUIT_SPECS[kind].half)
-    }
-    const loaded = await Assets.load<Texture>(urls)
+    // Atlas is preloaded on the boot screen; this is a cheap cache hit in-play.
+    await preloadGameAssets()
 
     const splitHalves = (half: Texture): { halfL: Texture; halfR: Texture } => {
-      const w = half.source.width
-      const h = half.source.height
+      // Use the frame rect (spritesheet), not the full atlas source size.
+      const frame = half.frame
+      const w = frame.width
+      const h = frame.height
       return {
-        halfL: new Texture({ source: half.source, frame: new Rectangle(0, 0, w / 2, h) }),
-        halfR: new Texture({ source: half.source, frame: new Rectangle(w / 2, 0, w / 2, h) }),
+        halfL: new Texture({
+          source: half.source,
+          frame: new Rectangle(frame.x, frame.y, w / 2, h),
+        }),
+        halfR: new Texture({
+          source: half.source,
+          frame: new Rectangle(frame.x + w / 2, frame.y, w / 2, h),
+        }),
       }
     }
 
     for (const kind of EDIBLE_KINDS) {
-      const whole = loaded[FRUIT_SPECS[kind].whole]
-      const half = loaded[FRUIT_SPECS[kind].half]
+      const whole = getFruitTexture(FRUIT_SPECS[kind].whole)
+      const half = getFruitTexture(FRUIT_SPECS[kind].half)
       this.textures.set(kind, { whole, ...splitHalves(half) })
     }
-    const bombTex = loaded[bombUrl]
+    const bombTex = getFruitTexture('bomb')
     this.textures.set('bomb', { whole: bombTex, halfL: bombTex, halfR: bombTex })
   }
 
@@ -363,12 +376,33 @@ export class FruitRushGame {
     this.host.replaceChildren()
   }
 
+  private lastHudKey = ''
+
   private emitHud() {
+    const multiplier = comboMultiplier(this.combo)
+    const lives = Math.min(this.lives, 3)
+    // Throttle React: only push when a displayed field actually changes.
+    // Time is quantized to 0.1s so we don't setState at 60 Hz.
+    const timeKey =
+      this.timeLeft === null ? '∞' : (Math.ceil(this.timeLeft * 10) / 10).toFixed(1)
+    const countdownKey = (Math.ceil(this.countdown * 10) / 10).toFixed(1)
+    const key = [
+      this.score,
+      this.combo,
+      multiplier,
+      lives,
+      timeKey,
+      this.mode,
+      this.status,
+      countdownKey,
+    ].join('|')
+    if (key === this.lastHudKey) return
+    this.lastHudKey = key
     this.onHud({
       score: this.score,
       combo: this.combo,
-      multiplier: comboMultiplier(this.combo),
-      lives: Math.min(this.lives, 3),
+      multiplier,
+      lives,
       timeLeft: this.timeLeft,
       mode: this.mode,
       status: this.status,
@@ -381,6 +415,13 @@ export class FruitRushGame {
   private update(rawDt: number) {
     if (!this.app || this.destroyed) return
     const realDt = Math.min(rawDt, 0.05)
+
+    // Freeze world while paused — keep the last frame painted.
+    if (this.paused || this.status === 'paused') {
+      this.trailGfx.clear()
+      this.emitHud()
+      return
+    }
 
     // Hit-stop: world time pauses, but the trail and shake stay live.
     let dt = realDt
@@ -505,30 +546,13 @@ export class FruitRushGame {
 
   /** Decide fruit vs bomb vs spike/ice for the next launch. */
   private pickSpawnKind(): PendingSpawn['kind'] {
-    // Zen is pure practice — never throw hazards.
-    if (!this.config.bombs && !this.config.hazards) return 'fruit'
-
-    // Guaranteed bomb cadence so Classic always feels the threat.
-    if (this.config.bombs && this.elapsed > 4 && this.sinceBomb >= 5) {
-      return 'bomb'
-    }
-
-    // Guaranteed spike/ice between bombs.
-    if (this.config.hazards && this.elapsed > 3 && this.sinceHazard >= 4) {
-      return Math.random() < 0.55 ? 'spike' : 'ice'
-    }
-
-    if (this.config.bombs) {
-      const bombChance = this.inFrenzy ? 0.22 : 0.16
-      if (Math.random() < bombChance) return 'bomb'
-    }
-
-    if (this.config.hazards) {
-      const hazardChance = this.inFrenzy ? 0.18 : 0.12
-      if (Math.random() < hazardChance) return Math.random() < 0.55 ? 'spike' : 'ice'
-    }
-
-    return 'fruit'
+    return pickSpawnKind({
+      mode: this.mode,
+      elapsed: this.elapsed,
+      sinceBomb: this.sinceBomb,
+      sinceHazard: this.sinceHazard,
+      inFrenzy: this.inFrenzy,
+    })
   }
 
   private pickKind(): EdibleKind {
@@ -546,10 +570,22 @@ export class FruitRushGame {
     const h = this.app.screen.height
 
     let kind: FruitKind
-    if (spawnKind === 'bomb' && this.config.bombs) kind = 'bomb'
+    // Belt-and-suspenders: Zen never materializes hazards even if a stale
+    // wave queued a bomb/spike/ice kind before mode config was applied.
+    if (this.mode === 'Zen') kind = this.pickKind()
+    else if (spawnKind === 'bomb' && this.config.bombs) kind = 'bomb'
     else if (spawnKind === 'spike' && this.config.hazards) kind = 'spike'
     else if (spawnKind === 'ice' && this.config.hazards) kind = 'ice'
     else kind = this.pickKind()
+
+    // Dev/test probe — Playwright reads this to verify bombs actually spawn.
+    const probe = globalThis as typeof globalThis & {
+      __fruitRushSpawns?: string[]
+      __fruitRushMode?: string
+    }
+    probe.__fruitRushMode = this.mode
+    probe.__fruitRushSpawns = probe.__fruitRushSpawns ?? []
+    probe.__fruitRushSpawns.push(kind)
 
     if (kind === 'bomb') {
       this.sinceBomb = 0
@@ -810,7 +846,7 @@ export class FruitRushGame {
   private onPointerDown(e: PointerEvent) {
     // Phones suspend AudioContext after async texture load — re-kick on every swipe.
     audio.kick()
-    if (this.status !== 'playing') return
+    if (this.paused || this.status !== 'playing') return
     const p = this.toLocal(e)
     this.slicing = true
     this.lastPointer = p
@@ -818,7 +854,7 @@ export class FruitRushGame {
   }
 
   private onPointerMove(e: PointerEvent) {
-    if (!this.slicing || this.status !== 'playing') return
+    if (this.paused || !this.slicing || this.status !== 'playing') return
     const p = this.toLocal(e)
     const speed = Math.hypot(p.x - this.lastPointer.x, p.y - this.lastPointer.y)
     this.trail.push({ ...p, t: performance.now() })

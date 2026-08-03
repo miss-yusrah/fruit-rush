@@ -24,7 +24,7 @@ export interface GameHudState {
   lives: number
   timeLeft: number | null
   mode: GameMode
-  status: 'countdown' | 'playing' | 'ended'
+  status: 'countdown' | 'playing' | 'paused' | 'ended'
   countdown: number
 }
 
@@ -43,7 +43,7 @@ export interface GameEndPayload {
 export const MODE_CONFIG: Record<
   GameMode,
   {
-    /** Round length in seconds. `null` = endless (Zen). */
+    /** Round length in seconds. `null` = endless (survive until lives/bomb). */
     duration: number | null
     bombs: boolean
     /** Extra hazards (spike / ice) that punish a slice without ending the run. */
@@ -54,18 +54,18 @@ export const MODE_CONFIG: Record<
     lives: number
   }
 > = {
-  // Classic: timed round with bombs + hazards. 90s reads as 1:30 on the HUD.
+  // Classic (Fruit Ninja-style): endless survival — bombs + lives end the run.
   Classic: {
-    duration: 90,
+    duration: null,
     bombs: true,
     hazards: true,
     spawnMinMs: 520,
     spawnMaxMs: 1000,
     lives: 3,
   },
-  // Zen: endless practice — no bombs, no hazards, no timer.
+  // Zen: chill timed slice — 90s, no bombs, no hazards.
   Zen: {
-    duration: null,
+    duration: 90,
     bombs: false,
     hazards: false,
     spawnMinMs: 700,
